@@ -228,12 +228,105 @@ button.link:hover {
 .a {
   padding-left: 8px;
   border-left: 2px solid rgba(255, 255, 255, 0.09);
-  white-space: pre-wrap;
   word-break: break-word;
 }
 
-.a b {
+/* The answer's Markdown: small, tight blocks, because these answers are a few lines and the pane is short. */
+.a p {
+  margin: 0 0 6px;
+}
+
+.a p:last-child,
+.a ul:last-child,
+.a ol:last-child,
+.a pre:last-child {
+  margin-bottom: 0;
+}
+
+.a h1,
+.a h2,
+.a h3,
+.a h4,
+.a h5,
+.a h6 {
+  margin: 8px 0 4px;
+  font-size: 13px;
   color: #ffe0a3;
+}
+
+.a ul,
+.a ol {
+  margin: 0 0 6px;
+  padding-left: 20px;
+}
+
+.a li {
+  margin: 1px 0;
+}
+
+.a b,
+.a strong {
+  color: #ffe0a3;
+}
+
+.a i {
+  opacity: 0.9;
+}
+
+.a s {
+  opacity: 0.6;
+}
+
+.a hr {
+  margin: 8px 0;
+  border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.a blockquote {
+  margin: 0 0 6px;
+  padding-left: 8px;
+  border-left: 2px solid rgba(200, 170, 110, 0.45);
+  color: var(--dim);
+}
+
+.a pre.code {
+  margin: 0 0 6px;
+  padding: 7px 9px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  overflow-x: auto;
+}
+
+.a pre.code code {
+  padding: 0;
+  background: none;
+  white-space: pre;
+}
+
+.a table {
+  margin: 0 0 6px;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.a th,
+.a td {
+  padding: 2px 7px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  text-align: left;
+}
+
+.a th {
+  background: rgba(255, 255, 255, 0.05);
+  color: #ffe0a3;
+}
+
+.a .url {
+  margin-left: 5px;
+  color: var(--dim);
+  font-size: 11.5px;
+  word-break: break-all;
 }
 
 .a code {

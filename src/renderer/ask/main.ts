@@ -1,5 +1,6 @@
 import type { AskChunk, AskContext, AskState } from '../../shared/askAi';
 import { strings, type Strings } from '../../shared/i18n';
+import { renderMarkdown } from './markdown';
 
 const el = <T extends HTMLElement>(id: string): T => document.getElementById(id) as T;
 
@@ -35,11 +36,8 @@ let reasoningText = '';
 
 const esc = (s: string): string => s.replace(/[&<>]/g, (c) => (c === '&' ? '&amp;' : c === '<' ? '&lt;' : '&gt;'));
 
-/**
- * The model answers in Markdown. Everything is escaped first, so an answer can never inject markup into this window,
- * and only bold and inline code are then rendered.
- */
-const format = (md: string): string => esc(md).replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>').replace(/`([^`]+)`/g, '<code>$1</code>');
+/** The answer is Markdown; see markdown.ts for what is rendered and why nothing can be injected. */
+const format = (md: string): string => renderMarkdown(md);
 
 const atBottom = (): boolean => thread.scrollHeight - thread.scrollTop - thread.clientHeight < 48;
 const toBottom = (): void => { thread.scrollTop = thread.scrollHeight; };
