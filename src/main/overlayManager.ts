@@ -2,7 +2,7 @@ import { BrowserWindow, ipcMain, screen, type Display, type WebContents } from '
 import { EventEmitter } from 'node:events';
 import { isEmoteRefShape, type EmoteArt, type EmoteRef } from '../shared/emotes';
 import {
-  OVERLAY_ASSETS, OVERLAY_EMOTED, OVERLAY_PINGED, type OverlayChannel, type OverlayEvents, type PingTag,
+  OVERLAY_ASKED, OVERLAY_ASSETS, OVERLAY_EMOTED, OVERLAY_PINGED, type OverlayChannel, type OverlayEvents, type PingTag,
 } from '../shared/ipc';
 import { isPingId, type PingId } from '../shared/pings';
 import type { HelperEvent, WheelKind } from '../shared/protocol';
@@ -27,12 +27,19 @@ export interface SharedEmote {
   y: number;
 }
 
+/** The Ask AI slice of the wheel was chosen, in overlay-local CSS px: the display to screenshot. */
+export interface AskedAt {
+  displayId: number;
+  x: number;
+  y: number;
+}
+
 const isNum = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 
 /**
  * One transparent, click-through, always-on-top window per display.
  * Emits 'shared' (SharedPing) for every wheel or trigger+click ping and 'sharedEmote' (SharedEmote) for every wheel or
- * trigger+click emote, never for settings previews.
+ * trigger+click emote, never for settings previews. Also emits 'asked' (AskedAt) when the wheel's Ask AI slice is chosen.
  */
 export class OverlayManager extends EventEmitter {
   readonly missingAssets = new Set<string>();
@@ -66,6 +73,13 @@ export class OverlayManager extends EventEmitter {
       this.emit('sharedEmote', { ref: p.ref, displayId, x: p.x, y: p.y } satisfies SharedEmote);
       // The wheel's own overlay already shows it. Another display may still hold an earlier one of ours.
       this.clearElsewhere(displayId, 'self');
+    });
+    ipcMain.on(OVERLAY_ASKED, (event, raw: unknown) => {
+      const p = raw as { x?: unknown; y?: unknown } | null;
+      if (!p || !isNum(p.x) || !isNum(p.y)) return;
+      const displayId = this.displayOf(event.sender);
+      if (displayId === undefined) return;
+      this.emit('asked', { displayId, x: p.x, y: p.y } satisfies AskedAt);
     });
     this.rebuild();
     screen.on('display-added', () => this.rebuild());
@@ -148,6 +162,19 @@ export class OverlayManager extends EventEmitter {
 
   toast(title: string, body: string): void {
     this.send(screen.getPrimaryDisplay().id, 'toast:show', { title, body });
+  }
+
+  /**
+   * Takes every overlay window off the screen for a screenshot: a window that is still drawing (a ping animation, the
+   * wheel itself) would otherwise be part of the captured image.
+   */
+  hideForCapture(): void {
+    for (const w of this.windows.values()) if (!w.isDestroyed()) w.hide();
+  }
+
+  /** Puts the overlay windows back after a capture. */
+  showForCapture(): void {
+    for (const w of this.windows.values()) if (!w.isDestroyed()) w.showInactive();
   }
 
   destroy(): void {

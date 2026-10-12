@@ -4,6 +4,10 @@
   <a href="README.md">English</a> | 简体中文
 </p>
 
+> **这是 [darrenprx/lolPing](https://github.com/darrenprx/lolPing) 的一个 fork。**
+> 原项目由 **Danrui Meng（[@darrenprx](https://github.com/darrenprx)）** 编写，输入钩子、轮盘、信号、表情、房间等功能都出自他之手；
+> 本 fork 只在此基础上加了「问 AI」截图提问（[见下文](#问-ai截图提问)）以及配套的设置项、提问窗和测试。详见[致谢](#致谢)。
+
 <p align="center">
   把英雄联盟的信号和表情搬到整个桌面，支持 Windows 和 macOS。<br>
   按住 <b>Alt</b>（Mac 上是 <b>⌥ Option</b>）拖动，在想要的信号上松开：动画弹出、音效响起，任何程序之上、任何显示器上都可以。<br>
@@ -64,7 +68,23 @@ Mac 版需要 Apple 芯片（M1 或更新）的 Mac 和 macOS 12 或更新版本
 
 在 Mac 上：用 **⌥ Option** 代替 Alt，用 **⌃ Control** 代替 Ctrl 发表情，用 **⌃⌥P** 暂停，用菜单栏中的信号图标代替托盘图标。
 
-轮盘从正上方开始顺时针依次是：危险（撤退）、推进、正在赶来、全力进攻（All In）、请求协助、需要视野、敌人消失、敌方视野。可以在设置中重新排列，或换上诱饵、视野已清除。表情轮盘同样有 8 个扇区，要放哪些表情在设置中选择。
+轮盘从正上方开始顺时针依次是：危险（撤退）、推进、正在赶来、全力进攻（All In）、请求协助、需要视野、敌人消失、敌方视野。可以在设置中重新排列，或换上诱饵、视野已清除。表情轮盘同样有 8 个扇区，要放哪些表情在设置中选择。信号轮盘还多一个「问 AI」扇区，见下一节。
+
+## 问 AI（截图提问）
+
+按住 **Alt** 打开轮盘，滑到那个带星形 **AI** 图标的扇区（在轮盘左上方，信号轮盘一共 9 个扇区），松手即可：
+
+1. lolPing 先把浮层从屏幕上撤下来，再截取该显示器（长边缩到 1600 px 的 JPEG，约 300 KB）。
+2. 屏幕中央弹出提问框，左上角是刚截的缩略图。输入问题后按 **回车** 提问，**Shift + 回车** 换行，**Esc** 关闭；留空直接回车就是问「这是现在的游戏画面，我接下来该做什么？」。
+3. 回答流式显示在同一个框里，可以滚动、选中、点「复制」。模型如果先思考，思维链会收在「思考中…」里。窗口打开期间浮层手势暂停，关掉就恢复。
+
+默认调用 DeepSeek 的多模态模型（`deepseek-flash`，即 V4.1 Flash，支持图片输入）。在 **设置 → AI 提问** 里填：
+
+- **DeepSeek API Key：** 在 [platform.deepseek.com](https://platform.deepseek.com) 申请。保存在 `%APPDATA%\lolPing\settings.json` 里（明文，和房间码一样），只用于截图提问。
+- **模型 / 接口地址：** 默认 `deepseek-flash` 和 `https://api.deepseek.com`；任何 OpenAI 兼容的 `/chat/completions` 接口都能填（中转、本地服务都行）。截图以 `image_url` 的 base64 data URL 发送。
+- **系统提示词：** 留空则用内置提示词，跟随界面语言（要求看清截图、直接给结论、最多 5 行）。
+
+提问用非思考模式（请求里带 `thinking: {"type": "disabled"}`），游戏里要的是快；如果接口不认这个字段，会自动去掉再试一次。隐私：截图和你输入的问题会发送到你填写的接口。请求默认直连、不走系统代理（Clash 之类没开也能用），直连失败时自动改用系统代理重试。
 
 ## 设置
 
@@ -161,6 +181,14 @@ npm run dev
 ## 信号素材
 
 `assets/textures` 中的图标和 `assets/sounds` 中的音效提取自本地安装的英雄联盟。游戏更新后如何重新提取，请见 [`tools/extract-assets`](tools/extract-assets)。`assets/emotes` 中的表情动画、图标和音效同样归 Riot Games 所有，由 `tools/extract-assets --emotes` 从同一份安装中烘焙生成。
+
+## 致谢
+
+感谢 **[Danrui Meng](https://github.com/darrenprx)**（[@darrenprx](https://github.com/darrenprx)）编写并开源了 [lolPing](https://github.com/darrenprx/lolPing)。
+
+这个项目里绝大部分东西都是他做的：C++ 输入助手和它吞掉 Alt + 拖动的方式、九个扇区的轮盘和动画、信号与表情素材、局域网 + Nostr 房间、多显示器坐标换算、Fluent UI 设置界面、自动更新，以及中英文文案。本 fork 只多了「问 AI」截图提问这一块（调用 DeepSeek 多模态接口），其它一律保持原样。
+
+如果这个功能对你有用，请先去给[原项目](https://github.com/darrenprx/lolPing)点个 star。
 
 ## 许可证
 

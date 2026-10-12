@@ -1,10 +1,11 @@
+import { ASK_ICON_URL, ASK_SLICE_KEY } from '../../shared/askAi';
 import { DEFAULT_CLICK_EMOTE, EMOTE_CATALOG } from '../../shared/emoteCatalog';
 import {
   allEmoteAssetFiles, catalogEmote, customAnimUrl, customHash, customStillUrl, emoteIconUrl, emoteSoundUrl, isBundledEmote,
   type EmoteArt, type EmoteRef,
 } from '../../shared/emotes';
 import {
-  DEFAULT_CLICK_PING, TICK_SOUND, allSoundNames, allTextureNames, pingById, pingsFor, soundUrl, textureUrl, type PingDef,
+  DEFAULT_CLICK_PING, PING_WHEEL_SLOTS, TICK_SOUND, allSoundNames, allTextureNames, pingById, pingsFor, soundUrl, textureUrl, type PingDef,
 } from '../../shared/pings';
 import type { PingTag } from '../../shared/ipc';
 import type { WheelKind } from '../../shared/protocol';
@@ -36,10 +37,13 @@ const volume = (): number => (settings.muted ? 0 : settings.volume / 100);
 const tick = (): void => {
   if (settings.tickSound) sounds.play(TICK_SOUND, volume() * 0.5);
 };
-const pingWheel = new Wheel(pingSvg, 'PING', textureUrl('generic_ping'), tick);
+const pingWheel = new Wheel(pingSvg, 'PING', textureUrl('generic_ping'), tick, PING_WHEEL_SLOTS);
 const emoteWheel = new Wheel(emoteSvg, 'EMOTE', emoteIconUrl(DEFAULT_CLICK_EMOTE), tick);
 
 const pingItem = (p: PingDef): WheelItem => ({ key: p.id, icon: textureUrl(p.icon) });
+
+/** The slice after the eight pings: choosing it asks the AI about a screenshot instead of placing a ping. */
+const ASK_ITEM: WheelItem = { key: ASK_SLICE_KEY, icon: ASK_ICON_URL };
 
 /** A wheel slot's icon: the bundled emote's, the imported emote's still, or the generic ping for one that isn't known. */
 function emoteItem(ref: EmoteRef): WheelItem {
@@ -59,7 +63,7 @@ function localArt(ref: EmoteRef): EmoteArt {
 
 function applySettings(s: OverlaySettings): void {
   settings = s;
-  pingWheel.setItems(pingsFor(s.wheel).map(pingItem));
+  pingWheel.setItems([...pingsFor(s.wheel).map(pingItem), ASK_ITEM]);
   emoteWheel.setItems(s.emoteWheel.map(emoteItem));
 }
 applySettings(settings);
@@ -85,6 +89,9 @@ window.overlay.on('wheel:release', (p) => {
   if (p.wheel === 'emote') {
     emote('self', localArt(chosen.key), chosen.x, chosen.y);
     window.overlay.reportEmote(chosen.key, chosen.x, chosen.y);
+  } else if (chosen.key === ASK_SLICE_KEY) {
+    // Nothing is placed on screen: the main process takes the screenshot once this wheel is off the screen.
+    window.overlay.reportAsk(chosen.x, chosen.y);
   } else {
     const def = pingById(chosen.key) ?? fallbackPing;
     ping(def, chosen.x, chosen.y);

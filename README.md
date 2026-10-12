@@ -4,6 +4,10 @@
   English | <a href="README.zh-CN.md">简体中文</a>
 </p>
 
+> **This is a fork of [darrenprx/lolPing](https://github.com/darrenprx/lolPing).**
+> The original project is by **Danrui Meng ([@darrenprx](https://github.com/darrenprx))**; the input hook, the wheel, the pings, the emotes and the rooms are all their work.
+> This fork only adds Ask AI (see [below](#ask-ai)) with its settings, question window and tests. See [Credits](#credits).
+
 <p align="center">
   League of Legends pings and emotes for your whole desktop, on Windows and macOS.<br>
   Hold <b>Alt</b> (<b>⌥ Option</b> on a Mac), drag, and let go on a ping. The animation pops and the sound plays on top of any app, on any monitor.<br>
@@ -64,7 +68,23 @@ Updating from v0.4 or earlier: download the new version by hand once. From v0.5 
 
 On a Mac, use **⌥ Option** instead of Alt, **⌃ Control** instead of Ctrl for emotes, **⌃⌥P** to pause, and the ping icon in the menu bar instead of the tray icon.
 
-The wheel, from the top going clockwise: Danger, Push, On My Way, All In, Assist Me, Need Vision, Enemy Missing, Enemy Vision. You can rearrange it and add Bait or Vision Cleared in settings. The emote wheel has 8 slots too, and you pick its emotes in settings.
+The wheel, from the top going clockwise: Danger, Push, On My Way, All In, Assist Me, Need Vision, Enemy Missing, Enemy Vision. You can rearrange it and add Bait or Vision Cleared in settings. The emote wheel has 8 slots too, and you pick its emotes in settings. The ping wheel has one slice more: Ask AI (see below).
+
+## Ask AI
+
+Hold **Alt**, drag onto the slice with the **AI** sparkle icon (upper left of the wheel, the ninth slice) and let go:
+
+1. lolPing takes its overlays off the screen first, then captures that display (JPEG, long edge scaled to 1600 px, roughly 300 KB).
+2. A question window opens in the middle of that display with the screenshot in the corner. Type a question and press **Enter** (**Shift + Enter** for a new line, **Esc** to close); pressing Enter with an empty box asks "This is my game right now. What should I do next?".
+3. The answer streams into the same window: scroll it, select it, or copy it. A reasoning chain, when the model produces one, stays folded under "Thinking…". Wheel gestures are paused while the window is open.
+
+It calls DeepSeek's multimodal model (`deepseek-flash`, V4.1 Flash) by default. **Settings → Ask AI** holds the key and the endpoint:
+
+- **DeepSeek API key:** from [platform.deepseek.com](https://platform.deepseek.com). It is stored in `settings.json` in the clear, like the room code, and is used only for these questions.
+- **Model / endpoint:** `deepseek-flash` and `https://api.deepseek.com` by default; any OpenAI-compatible `/chat/completions` works (a relay, a local server). The screenshot goes as an `image_url` base64 data URL.
+- **System prompt:** empty uses the built-in one, in the interface language.
+
+Questions run in the non-thinking mode (`thinking: {"type": "disabled"}`), because a game answer is wanted now; an endpoint that doesn't know the field gets the same request without it. The request goes straight out, ignoring the system proxy, and falls back to it when nothing can be reached directly. Privacy: the screenshot and your question go to the endpoint you configure.
 
 ## Settings
 
@@ -161,6 +181,14 @@ Bump `version` in `package.json`, commit, then push a matching tag such as `v0.2
 ## Ping assets
 
 The icons in `assets/textures` and the sounds in `assets/sounds` come from a local League of Legends install. [`tools/extract-assets`](tools/extract-assets) explains how to extract them again after a patch. The emote animations, icons and sounds in `assets/emotes` are © Riot Games too, and `tools/extract-assets --emotes` bakes them from the same install.
+
+## Credits
+
+Thanks to **[Danrui Meng](https://github.com/darrenprx)** ([@darrenprx](https://github.com/darrenprx)) for writing and open-sourcing [lolPing](https://github.com/darrenprx/lolPing).
+
+Nearly everything here is their work: the C++ input helper and the way it swallows Alt + drag, the wheel and its animations, the ping and emote assets, the rooms over the LAN and Nostr, the multi-monitor maths, the Fluent UI settings window, the updater, and both language tables. This fork adds one thing on top — Ask AI, which asks DeepSeek's multimodal model about a screenshot — and leaves the rest alone.
+
+If the feature is useful to you, go and star the [original project](https://github.com/darrenprx/lolPing).
 
 ## License
 

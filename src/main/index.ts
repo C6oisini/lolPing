@@ -3,6 +3,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { resolveLang, strings, type Strings } from '../shared/i18n';
+import type { AskImage } from '../shared/askAi';
 import { SETTINGS_CH, type About, type AppStatus } from '../shared/ipc';
 import { hotkeyLabel } from '../shared/keys';
 import { configCommand, type HelperStatus } from '../shared/protocol';
@@ -11,16 +12,18 @@ import { formatRoomCode, parseRoomCode } from '../shared/roomCode';
 import { overlaySettings, type Settings } from '../shared/settings';
 import { updateErrorText, type UpdateState } from '../shared/update';
 import { registerAppScheme, serveAppScheme } from './appProtocol';
+import { destroyAskWindow, installAskIpc, openAskWindow } from './askWindow';
 import { resolveTarget, toShared } from './displayNumbers';
 import { EmoteLibrary, resolveEmoteArt } from './emoteLibrary';
 import { InputBridge } from './inputBridge';
 import { LanTransport } from './lanTransport';
 import { RELAYS } from './relays';
 import { RelayTransport } from './relayTransport';
-import { OverlayManager, type SharedEmote, type SharedPing } from './overlayManager';
+import { OverlayManager, type AskedAt, type SharedEmote, type SharedPing } from './overlayManager';
 import { assetPath, buildResourcePath, helperExePath, IS_MAC, PLATFORM, settingsDir } from './paths';
 import { deriveRoomKeys } from './roomCrypto';
 import { RoomManager, type RoomToast } from './roomManager';
+import { captureDisplay } from './screenshot';
 import { registerSettingsIpc } from './settingsIpc';
 import { SettingsStore } from './settingsStore';
 import { onSettingsWindowGone, openSettingsWindow, settingsWindow } from './settingsWindow';
@@ -87,10 +90,12 @@ function start(): void {
   let enabled = settings.enabledOnStart;
   let quitting = false; // read by pushStatus: once true, the tray and overlays are gone
   let capturing = false; // the settings page is listening for a key, so the helper must stay suspended
+  let asking = false; // the question window is open: neither a key capture nor a gesture may run behind it
 
   const overlays = new OverlayManager(overlaySettings(settings), (ref, remote) => resolveEmoteArt(ref, settings.customEmotes, remote));
   overlays.start();
   const bridge = new InputBridge({ command: helperExePath() });
+  const syncSuspend = (): void => bridge.send({ type: 'suspend', on: capturing || asking });
 
   // Updates: only in an installed build, or in a development build pointed at a test server with LOLPING_UPDATE_TEST_URL.
   const testUrl = process.env.LOLPING_UPDATE_TEST_URL || undefined;
@@ -354,7 +359,7 @@ function start(): void {
     retryHelper: startHelper,
     setCapturing: (on) => {
       capturing = on;
-      bridge.send({ type: 'suspend', on });
+      syncSuspend();
     },
     openAccessibility: () => {
       systemPreferences.isTrustedAccessibilityClient(true); // adds lolPing to the list and shows the system prompt
@@ -381,7 +386,37 @@ function start(): void {
   onSettingsWindowGone(() => {
     if (!capturing) return;
     capturing = false;
-    bridge.send({ type: 'suspend', on: false });
+    syncSuspend();
+  });
+
+  /**
+   * Ask AI: the wheel's extra slice was chosen. The overlays come off the screen first (a wheel or a ping still being
+   * drawn would end up in the picture), the display is captured, and the question window opens on it. A failed capture
+   * still opens the window: the question can be asked without the screenshot.
+   */
+  const ASK_CAPTURE_DELAY_MS = 140;
+  const startAsk = async (displayId: number): Promise<void> => {
+    overlays.cancelWheel();
+    overlays.hideForCapture();
+    let image: AskImage | null = null;
+    try {
+      await new Promise((resolve) => setTimeout(resolve, ASK_CAPTURE_DELAY_MS));
+      image = await captureDisplay(displayId);
+    } catch (err) {
+      console.warn('[ask]', err);
+    } finally {
+      overlays.showForCapture();
+    }
+    openAskWindow({ displayId, image, imageFailed: image === null, lang: text().lang });
+  };
+  overlays.on('asked', (at: AskedAt) => void startAsk(at.displayId));
+  installAskIpc({
+    store,
+    openSettings: () => openSettingsWindow('ai'),
+    setAsking: (on) => {
+      asking = on;
+      syncSuspend();
+    },
   });
 
   bridge.send(configCommand(settings, enabled));
@@ -414,6 +449,7 @@ function start(): void {
     stopWaitingForAccess();
     tray.destroy();
     overlays.destroy();
+    destroyAskWindow();
     void Promise.allSettled([bridge.stop(), store.flush(), lan.whenClosed(), relay.whenClosed()]).then(() => app.exit(0));
   });
 }

@@ -19,6 +19,9 @@ const api: OverlayApi = {
   reportEmote() {
     // nor emotes
   },
+  reportAsk() {
+    // and no screen to screenshot: the demo's Ask AI slice does nothing
+  },
 };
 window.overlay = api;
 

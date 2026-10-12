@@ -1,7 +1,7 @@
 import { Dropdown, FluentProvider, Option, webDarkTheme, webLightTheme } from '@fluentui/react-components';
 import {
   ArrowMove24Regular, ArrowSync24Regular, CursorClick24Regular, DataPie24Regular, Games24Regular, Info24Regular, Keyboard24Regular, MusicNote224Regular,
-  Power24Regular, ResizeLarge24Regular, Rocket24Regular, Settings24Regular, Speaker224Regular, SpeakerMute24Regular,
+  Power24Regular, ResizeLarge24Regular, Rocket24Regular, Settings24Regular, Speaker224Regular, SpeakerMute24Regular, Sparkle24Regular,
   Timer24Regular, Cursor24Regular, Emoji24Regular, LocalLanguage24Regular, PeopleCommunity24Regular,
 } from '@fluentui/react-icons';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
@@ -13,6 +13,7 @@ import { triggerLabel, type Settings } from '../../shared/settings';
 import type { WheelPatch } from '../../shared/wheelLayout';
 import { api } from './api';
 import { AboutSection } from './components/AboutSection';
+import { AskSection } from './components/AskSection';
 import { EmoteSection } from './components/EmoteSection';
 import { KeyCapture } from './components/KeyCapture';
 import { PermissionCard } from './components/PermissionCard';
@@ -37,6 +38,7 @@ const SECTIONS: { id: string; label: (t: Strings) => string; icon: ReactNode }[]
   { id: 'pings', label: (t) => t.navPings, icon: <Speaker224Regular /> },
   { id: 'wheel', label: (t) => t.navWheel, icon: <DataPie24Regular /> },
   { id: 'emotes', label: (t) => t.navEmotes, icon: <Emoji24Regular /> },
+  { id: 'ai', label: (t) => t.navAi, icon: <Sparkle24Regular /> },
   { id: 'room', label: (t) => t.navRoom, icon: <PeopleCommunity24Regular /> },
   { id: 'app', label: (t) => t.navApp, icon: <Settings24Regular /> },
 ];
@@ -199,6 +201,9 @@ function SettingsPage({ settings: s, status, update }: { settings: Settings; sta
 
         <div className="section" id="emotes">{t.navEmotes}</div>
         <EmoteSection settings={s} update={update} lengthUnit={LENGTH_UNIT} />
+
+        <div className="section" id="ai">{t.navAi}</div>
+        <AskSection settings={s} update={update} trigger={trigger} />
 
         <div className="section" id="room">{t.navRoom}</div>
         <RoomSection settings={s} update={update} />

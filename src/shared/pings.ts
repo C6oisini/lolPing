@@ -34,6 +34,8 @@ export const ALL_PINGS: readonly PingDef[] = [
 export const DEFAULT_WHEEL: readonly PingId[] = ['danger', 'push', 'omw', 'allin', 'assist', 'needvision', 'missing', 'enemyvision'];
 export const DEFAULT_CLICK_PING: PingId = 'generic';
 export const WHEEL_SLOTS = 8;
+/** The ping wheel draws the 8 pings, then the Ask AI slice (see shared/askAi.ts): one slot more than the settings hold. */
+export const PING_WHEEL_SLOTS = WHEEL_SLOTS + 1;
 
 export const TICK_SOUND = 'button';
 export const FALLBACK_TEXTURE = 'generic_ping';

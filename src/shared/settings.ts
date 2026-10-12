@@ -1,3 +1,4 @@
+import { DEFAULT_ASK_BASE_URL, DEFAULT_ASK_MODEL } from './askAi';
 import { DEFAULT_CLICK_EMOTE, DEFAULT_EMOTE_WHEEL } from './emoteCatalog';
 import {
   CUSTOM_NAME_MAX, MAX_CUSTOM_EMOTES, customHash, isCustomRef, normalizeClickEmote, normalizeEmoteWheel,
@@ -65,6 +66,17 @@ export interface Settings {
   emoteSound: boolean;
   /** Imported emotes, at most MAX_CUSTOM_EMOTES. Their files live in the data folder. */
   customEmotes: CustomEmote[];
+  /**
+   * The wheel's Ask AI slice: the DeepSeek API key. Empty means the slice is there but the window only offers to open
+   * Settings. It is stored in settings.json in the clear, like the room code.
+   */
+  askAiKey: string;
+  /** The OpenAI-compatible endpoint the screenshot is posted to. */
+  askAiBaseUrl: string;
+  /** The model to call. It has to accept images. */
+  askAiModel: string;
+  /** Extra instructions for the model. Empty uses the built-in prompt for the interface language. */
+  askAiPrompt: string;
   /** Look for a new version on launch and every few hours. Checking by hand always works. */
   autoUpdateCheck: boolean;
   /** The newest version already announced with a toast, as x.y.z, so each version is announced once. */
@@ -108,6 +120,10 @@ export const DEFAULT_SETTINGS: Settings = {
   emoteSizePx: 150,
   emoteSound: true,
   customEmotes: [],
+  askAiKey: '',
+  askAiBaseUrl: DEFAULT_ASK_BASE_URL,
+  askAiModel: DEFAULT_ASK_MODEL,
+  askAiPrompt: '',
   autoUpdateCheck: true,
   updateNotifiedVersion: null,
 };
@@ -127,6 +143,21 @@ type BoolKey = 'enabledOnStart' | 'clickPing' | 'gameCheck' | 'muted' | 'tickSou
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isVk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 254;
+
+/** A trimmed text setting, capped so a pasted file can't end up in settings.json. */
+const text = (raw: unknown, fallback: string, max: number): string =>
+  typeof raw === 'string' ? raw.trim().slice(0, max) : fallback;
+
+/** The endpoint may be any OpenAI-compatible base URL, but only http(s): it is handed to fetch. */
+function baseUrl(raw: unknown): string {
+  const value = text(raw, DEFAULT_ASK_BASE_URL, 300);
+  try {
+    const { protocol } = new URL(value);
+    return protocol === 'https:' || protocol === 'http:' ? value : DEFAULT_ASK_BASE_URL;
+  } catch {
+    return DEFAULT_ASK_BASE_URL;
+  }
+}
 
 function num(raw: unknown, key: NumKey): number {
   const { min, max, step } = LIMITS[key];
@@ -246,6 +277,10 @@ export function normalizeSettings(raw: unknown, platform: Platform = 'win', iden
     emoteSizePx: num(r.emoteSizePx, 'emoteSizePx'),
     emoteSound: bool(r.emoteSound, 'emoteSound'),
     customEmotes: custom,
+    askAiKey: text(r.askAiKey, '', 200),
+    askAiBaseUrl: baseUrl(r.askAiBaseUrl),
+    askAiModel: text(r.askAiModel, DEFAULT_ASK_MODEL, 100) || DEFAULT_ASK_MODEL,
+    askAiPrompt: text(r.askAiPrompt, '', 2000),
     autoUpdateCheck: bool(r.autoUpdateCheck, 'autoUpdateCheck'),
     updateNotifiedVersion: isVersion(r.updateNotifiedVersion) ? r.updateNotifiedVersion : null,
   };

@@ -46,6 +46,8 @@ export const OVERLAY_ASSETS = 'overlay:assets';
 export const OVERLAY_PINGED = 'overlay:pinged';
 /** overlay renderer → main: {ref, x, y} of an emote the wheel just placed, so it can be shared with the room. */
 export const OVERLAY_EMOTED = 'overlay:emoted';
+/** overlay renderer → main: {x, y} where the Ask AI slice was chosen, so this display can be screenshotted. */
+export const OVERLAY_ASKED = 'overlay:asked';
 
 export interface AppStatus {
   enabled: boolean;
