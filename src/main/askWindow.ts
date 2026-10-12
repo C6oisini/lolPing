@@ -85,12 +85,14 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
     image: opts.image,
     imageFailed: opts.imageFailed,
   };
+  // A screenshot is a new question about a new moment, so it starts a new conversation — whether the window is being
+  // created or reused. Without this, a conversation left over from a window the user closed would be sent again with
+  // the new picture, which is both confusing for the model and a needless repeat of what was said before.
+  history = [];
   const existing = askWindow();
   if (existing) {
     existing.setBounds(placeOn(display));
     stopAnswer();
-    // A new screenshot is a new question about a new moment: the old conversation would only confuse the model.
-    history = [];
     setState({ status: 'idle' });
     send(ASK_CH.context, context);
     existing.show();
@@ -126,6 +128,9 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
   w.on('closed', () => {
     win = null;
     stopAnswer();
+    // The conversation lived in this window: closing it drops what was said rather than keeping it for the next one.
+    history = [];
+    context = null;
     state = { status: 'idle' };
     deps?.setAsking(false);
   });
