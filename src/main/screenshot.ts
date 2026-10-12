@@ -6,7 +6,7 @@ const MAX_EDGE = 1600;
 /** Long edge of the frozen picture the picker shows: the display's own pixels, capped, because it travels over IPC. */
 const PREVIEW_EDGE = 2560;
 const JPEG_QUALITY = 88;
-/** A drag shorter than this (in CSS px) is a click: the whole display is wanted. */
+/** A drag shorter than this in both directions is a click: the whole display is wanted. Matches MIN_PX in the picker. */
 export const MIN_SELECTION_PX = 12;
 
 /** One display, captured before anything is asked about it. */
@@ -42,7 +42,8 @@ export const previewOf = (capture: Capture): AskImage => askImageOf(capture.imag
  * for the whole display.
  */
 export function cropAskImage(capture: Capture, rect: PickRect | null): AskImage {
-  if (!rect || rect.width < MIN_SELECTION_PX || rect.height < MIN_SELECTION_PX) return askImageOf(capture.image);
+  const picked = rect !== null && (rect.width >= MIN_SELECTION_PX || rect.height >= MIN_SELECTION_PX);
+  if (!picked || !rect) return askImageOf(capture.image);
   const pixels = selectionToPixels(rect, capture.css, capture.image.getSize());
   return askImageOf(capture.image.crop(pixels));
 }

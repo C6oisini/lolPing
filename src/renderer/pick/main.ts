@@ -9,11 +9,13 @@ const box = el('box');
 const sizeLabel = el('size');
 const hint = el('hint');
 
-/** A drag shorter than this is a click: the whole display is what the user wants. Matches MIN_SELECTION_PX in main. */
+/** A drag shorter than this in both directions is a click: the whole display is what the user wants. */
 const MIN_PX = 12;
+/** How far the pointer has to move before this counts as a drag rather than a click. */
+const DRAG_PX = 3;
 
-let ctx: PickContext;
 let from: { x: number; y: number } | null = null;
+let dragging = false;
 let rect: PickRect | null = null;
 let sent = false;
 
@@ -21,6 +23,9 @@ let sent = false;
 function rectOf(a: { x: number; y: number }, b: { x: number; y: number }): PickRect {
   return { x: Math.min(a.x, b.x), y: Math.min(a.y, b.y), width: Math.abs(b.x - a.x), height: Math.abs(b.y - a.y) };
 }
+
+/** A thin strip is a deliberate selection (a health bar, a tooltip): either direction is enough. */
+const isSelection = (r: PickRect | null): r is PickRect => r !== null && (r.width >= MIN_PX || r.height >= MIN_PX);
 
 function paint(): void {
   if (!rect || rect.width < 1 || rect.height < 1) {
@@ -57,9 +62,7 @@ function cancel(): void {
   void window.pickApi.cancel();
 }
 
-function point(e: MouseEvent): { x: number; y: number } {
-  return { x: e.clientX, y: e.clientY };
-}
+const point = (e: MouseEvent): { x: number; y: number } => ({ x: e.clientX, y: e.clientY });
 
 window.addEventListener('mousedown', (e) => {
   if (e.button !== 0) {
@@ -67,35 +70,51 @@ window.addEventListener('mousedown', (e) => {
     return;
   }
   from = point(e);
-  rect = null;
-  paint();
+  dragging = false; // the box drawn last time stays until this drag makes a new one
 });
 window.addEventListener('mousemove', (e) => {
   if (!from) return;
-  rect = rectOf(from, point(e));
+  const next = rectOf(from, point(e));
+  if (!dragging && next.width < DRAG_PX && next.height < DRAG_PX) return;
+  dragging = true;
+  rect = next;
   paint();
 });
 window.addEventListener('mouseup', (e) => {
   if (e.button !== 0 || !from) return;
   const box = rectOf(from, point(e));
   from = null;
-  rect = box;
-  paint();
-  // A click, or a box too small to be meant, sends the whole display.
-  finish(box.width < MIN_PX || box.height < MIN_PX ? null : box);
+  if (dragging && isSelection(box)) {
+    rect = box;
+    paint();
+    finish(box);
+    return;
+  }
+  // A click — often a second click to confirm what was just drawn — sends the box already selected, and only sends the
+  // whole display when nothing has been selected at all.
+  dragging = false;
+  finish(isSelection(rect) ? rect : null);
 });
 window.addEventListener('keydown', (e) => {
   if (e.key === 'Escape') cancel();
-  else if (e.key === 'Enter') finish(rect && rect.width >= MIN_PX && rect.height >= MIN_PX ? rect : null);
+  else if (e.key === 'Enter') finish(isSelection(rect) ? rect : null);
 });
+// Nothing in this window is draggable: a native drag would take the mouse and the selection would never see its mouseup.
+window.addEventListener('dragstart', (e) => e.preventDefault());
 window.addEventListener('contextmenu', (e) => e.preventDefault());
 
-void window.pickApi.getContext().then((c) => {
-  ctx = c;
+window.pickApi.onContext(async (c: PickContext) => {
   const t = strings(c.lang);
   document.documentElement.lang = t.lang;
+  hint.textContent = t.askPickHint;
+  // A fresh picture for a fresh pick: no box, no "already answered" flag from the last one.
+  from = null;
+  dragging = false;
+  rect = null;
+  sent = false;
+  paint();
   shot.src = c.image.dataUrl;
   shotBright.src = c.image.dataUrl;
-  hint.textContent = t.askPickHint;
-  paint();
+  await Promise.all([shot.decode().catch(() => undefined), shotBright.decode().catch(() => undefined)]);
+  window.pickApi.ready();
 });

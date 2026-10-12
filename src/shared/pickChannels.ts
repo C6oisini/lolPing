@@ -3,10 +3,12 @@
  * gets its own copy of the names instead of sharing a chunk with another preload.
  */
 export const PICK_CH = {
-  /** invoke → PickContext: the frozen screenshot and the language. */
+  /** main → renderer: the frozen screenshot and the language, pushed in each time the picker is shown. */
   context: 'pick:context',
-  /** invoke(rect | null) → void. */
+  /** renderer → main: the picture is painted, so the window can be shown. */
+  ready: 'pick:ready',
+  /** renderer → main: invoke(rect | null). */
   done: 'pick:done',
-  /** invoke → void: no screenshot this time. */
+  /** renderer → main: invoke, no screenshot this time. */
   cancel: 'pick:cancel',
 } as const;

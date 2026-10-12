@@ -153,7 +153,10 @@ export interface PickContext {
 
 /** window.pickApi in the picker renderer. */
 export interface PickApi {
-  getContext(): Promise<PickContext>;
+  /** The main process pushes the frozen picture in; the window answers with ready() once it is on screen. */
+  onContext(cb: (c: PickContext) => void): () => void;
+  /** The new picture is decoded and painted: the window may be shown. */
+  ready(): void;
   /** `rect` is the selection in the display's CSS pixels; null asks for the whole display. */
   done(rect: PickRect | null): Promise<void>;
   cancel(): Promise<void>;

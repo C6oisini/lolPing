@@ -3,7 +3,7 @@ import { randomBytes, randomInt } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
 import { resolveLang, strings, type Strings } from '../shared/i18n';
-import type { AskImage } from '../shared/askAi';
+import type { AskImage, PickResult } from '../shared/askAi';
 import { SETTINGS_CH, type About, type AppStatus } from '../shared/ipc';
 import { hotkeyLabel } from '../shared/keys';
 import { configCommand, type HelperStatus } from '../shared/protocol';
@@ -21,7 +21,7 @@ import { RELAYS } from './relays';
 import { RelayTransport } from './relayTransport';
 import { OverlayManager, type AskedAt, type SharedEmote, type SharedPing } from './overlayManager';
 import { assetPath, buildResourcePath, helperExePath, IS_MAC, PLATFORM, settingsDir } from './paths';
-import { destroyPickWindow, installPickIpc, pickRegion } from './pickWindow';
+import { destroyPickWindow, installPickIpc, pickRegion, warmPickWindow } from './pickWindow';
 import { deriveRoomKeys } from './roomCrypto';
 import { RoomManager, type RoomToast } from './roomManager';
 import { askImageOf, captureDisplay, cropAskImage, type Capture } from './screenshot';
@@ -396,7 +396,7 @@ function start(): void {
    * is shown for a region to be dragged out. A failed capture still opens the window: the question can be asked
    * without the screenshot.
    */
-  const ASK_CAPTURE_DELAY_MS = 140;
+  const ASK_CAPTURE_DELAY_MS = 90;
   /**
    * Development only, and in the spirit of LOLPING_RELAYS: LOLPING_ASK_TEST_IMAGE points at a picture to use instead
    * of capturing the screen, so the flow can be tried with no game (or no usable screen) in front. Packaged builds
@@ -413,6 +413,9 @@ function start(): void {
   const startAsk = async (displayId: number): Promise<void> => {
     overlays.cancelWheel();
     overlays.hideForCapture();
+    const wantsPicker = store.get().askAiSelectRegion;
+    // The picker page takes a moment to load: do it while the screen is captured, not after.
+    if (wantsPicker) warmPickWindow();
     let capture: Capture | null = null;
     try {
       await new Promise((resolve) => setTimeout(resolve, ASK_CAPTURE_DELAY_MS));
@@ -424,18 +427,23 @@ function start(): void {
     }
     let image: AskImage | null = null;
     if (capture) {
-      if (store.get().askAiSelectRegion) {
+      if (wantsPicker) {
         // The picker covers the screen: keep gestures suspended, exactly as the question window does.
         const before = asking;
         asking = true;
         syncSuspend();
-        const picked = await pickRegion(displayId, capture, text().lang);
-        if (picked.kind === 'cancelled') {
+        let picked: PickResult | null = null;
+        try {
+          picked = await pickRegion(displayId, capture, text().lang);
+        } catch (err) {
+          console.warn('[ask]', err); // a picker that can't open still asks, about the whole display
+        }
+        if (picked?.kind === 'cancelled') {
           asking = before;
           syncSuspend();
           return;
         }
-        image = cropAskImage(capture, picked.rect);
+        image = picked ? cropAskImage(capture, picked.rect) : askImageOf(capture.image);
       } else {
         image = askImageOf(capture.image);
       }

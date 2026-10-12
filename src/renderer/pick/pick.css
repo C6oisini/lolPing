@@ -13,6 +13,14 @@ body {
   font: 13px/1.5 "Segoe UI", system-ui, "Microsoft YaHei", sans-serif;
 }
 
+/* The frozen screen is only a background: it must never take the mouse itself. An <img> is draggable by default in
+   Chromium, and a drag that starts on it swallows the mouseup, which is exactly the event the selection needs. */
+.shot,
+.bright img {
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
 /* The frozen screen: dimmed underneath, and shown at full brightness inside the selection. */
 .shot {
   position: fixed;
