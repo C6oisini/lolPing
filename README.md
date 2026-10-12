@@ -74,11 +74,15 @@ The wheel, from the top going clockwise: Danger, Push, On My Way, All In, Assist
 
 Hold **Alt**, drag onto the slice with the **AI** sparkle icon (upper left of the wheel, the ninth slice) and let go:
 
+![The screen freezes; drag out the area to send](docs/media/ask-ai-picker.png)
+
 1. lolPing takes its overlays off the screen first, then captures that display.
 2. The screen **freezes** for you to **drag out the area** you want: the selection stays bright, the rest dims, and the size follows the box. Let go to carry on; a plain **click** (or Enter) sends the whole display, and **Esc** or a right-click drops the gesture. **Settings → Ask AI → Choose the area each time** turns it off and always sends the whole display.
 3. A question window opens with the screenshot (or the crop) in the corner. Type and press **Enter** (**Shift+Enter** for a new line, **Esc** to close); pressing Enter with an empty box asks "what should I do next?".
 4. The answer streams in below, rendered as **Markdown** (headings, lists, tables, code blocks, quotes, bold/italic/inline code), and it can be scrolled, selected, or copied (the copy is the original Markdown). A reasoning chain, when the model produces one, stays folded under "Thinking…". Links show their text and address but are not clickable: this is an overlay window, and following one would take the question away with it.
 5. **Follow-ups continue the same conversation** in that window; the earlier exchanges go back to the model with the new question. The screenshot rides along with the first turn only, so it is never uploaded twice. **New chat** forgets the context, and picking the AI slice again means a new screenshot and a new conversation. Wheel gestures are paused while the window is open.
+
+![The question window: the crop in the corner, the answer rendered as Markdown, follow-ups below](docs/media/ask-ai-window.png)
 
 It calls DeepSeek's multimodal model (`deepseek-flash`, V4.1 Flash) by default. **Settings → Ask AI** holds the key and the endpoint:
 
