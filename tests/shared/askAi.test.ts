@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { askDefaultPrompt, ASK_SLICE_KEY, DEFAULT_ASK_BASE_URL, DEFAULT_ASK_MODEL } from '../../src/shared/askAi';
+import { askDefaultPrompt, askMessages, ASK_SLICE_KEY, DEFAULT_ASK_BASE_URL, DEFAULT_ASK_MODEL, selectionToPixels } from '../../src/shared/askAi';
 import { pickSlice, sliceAngle, sliceHalf } from '../../src/shared/geometry';
 import { normalizeSettings } from '../../src/shared/settings';
 import { ASK_ICON_URL } from '../../src/shared/askAi';
@@ -33,6 +33,74 @@ describe('the ping wheel with the Ask AI slice', () => {
   it('never mistakes the slice for a ping, and ships an icon for it', () => {
     expect(isPingId(ASK_SLICE_KEY)).toBe(false);
     expect(ASK_ICON_URL.startsWith('data:image/svg+xml;utf8,')).toBe(true);
+  });
+});
+
+describe('askMessages', () => {
+  const image = 'data:image/jpeg;base64,AAAA';
+
+  it('sends the first question with the screenshot', () => {
+    const messages = askMessages('sys', [], '现在做什么？', image);
+    expect(messages).toEqual([
+      { role: 'system', content: 'sys' },
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: '现在做什么？' },
+          { type: 'image_url', image_url: { url: image, detail: 'high' } },
+        ],
+      },
+    ]);
+  });
+
+  it('attaches the screenshot once, to the first question, and sends the rest as plain text', () => {
+    const history = [
+      { role: 'user' as const, text: '现在做什么？' },
+      { role: 'assistant' as const, text: '退回塔下。' },
+    ];
+    const messages = askMessages('sys', history, '那出什么装备？', image);
+    expect(messages).toHaveLength(4);
+    expect(messages[0]).toEqual({ role: 'system', content: 'sys' });
+    // The picture stays with the turn that started the conversation; repeating it would cost its tokens on every follow-up.
+    expect(messages[1]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: '现在做什么？' },
+        { type: 'image_url', image_url: { url: image, detail: 'high' } },
+      ],
+    });
+    expect(messages[2]).toEqual({ role: 'assistant', content: '退回塔下。' });
+    expect(messages[3]).toEqual({ role: 'user', content: '那出什么装备？' });
+  });
+
+  it('sends plain text when there is no screenshot at all', () => {
+    const history = [{ role: 'user' as const, text: '第一问' }, { role: 'assistant' as const, text: '答' }];
+    expect(askMessages('sys', history, '第二问', null)).toEqual([
+      { role: 'system', content: 'sys' },
+      { role: 'user', content: '第一问' },
+      { role: 'assistant', content: '答' },
+      { role: 'user', content: '第二问' },
+    ]);
+  });
+});
+
+describe('selectionToPixels', () => {
+  const css = { width: 1280, height: 720 };
+  const image = { width: 2560, height: 1440 }; // a 200% display
+
+  it('scales a selection from the display\'s CSS pixels into the capture\'s pixels', () => {
+    expect(selectionToPixels({ x: 100, y: 50, width: 200, height: 100 }, css, image)).toEqual({ x: 200, y: 100, width: 400, height: 200 });
+  });
+
+  it('is the identity on an unscaled display', () => {
+    expect(selectionToPixels({ x: 3, y: 4, width: 5, height: 6 }, image, image)).toEqual({ x: 3, y: 4, width: 5, height: 6 });
+  });
+
+  it('never leaves the image, and never returns an empty rectangle', () => {
+    const clipped = selectionToPixels({ x: 1200, y: 700, width: 400, height: 400 }, css, image);
+    expect(clipped.x + clipped.width).toBeLessThanOrEqual(image.width);
+    expect(clipped.y + clipped.height).toBeLessThanOrEqual(image.height);
+    expect(selectionToPixels({ x: -50, y: -50, width: 0, height: 0 }, css, image)).toEqual({ x: 0, y: 0, width: 1, height: 1 });
   });
 });
 

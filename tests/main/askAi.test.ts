@@ -24,6 +24,7 @@ function call(over: Partial<AskCall> = {}): { call: AskCall; chunks: Array<{ kin
       baseUrl: 'https://api.deepseek.com',
       model: 'deepseek-flash',
       system: 'sys',
+      history: [],
       question: '现在该做什么？',
       image: 'data:image/jpeg;base64,AAAA',
       onChunk: (c) => chunks.push({ kind: c.kind, text: c.text }),
@@ -72,9 +73,10 @@ describe('streamAsk', () => {
     const { call: c } = call({ image: null });
     await streamAsk(c);
     const sent = JSON.parse((fetchMock.mock.calls[0] as [string, { body: string }])[1].body) as {
-      messages: Array<{ content: unknown[] }>;
+      messages: Array<{ content: unknown }>;
     };
-    expect(sent.messages[1].content).toEqual([{ type: 'text', text: '现在该做什么？' }]);
+    // Plain text, not a one-part block array: that is what the API wants when nothing but text is sent.
+    expect(sent.messages[1].content).toBe('现在该做什么？');
   });
 
   it('keeps a trailing slash off the endpoint and tolerates a /v1 base', async () => {

@@ -10,6 +10,8 @@ export const ASK_CH = {
   submit: 'ask:submit',
   /** invoke → void: stops the answer in flight, if any. */
   cancel: 'ask:cancel',
+  /** invoke → void: forgets the conversation so far and starts over. */
+  clear: 'ask:clear',
   /** invoke → void. */
   close: 'ask:close',
   /** invoke → void: puts the text on the clipboard from the main process. */

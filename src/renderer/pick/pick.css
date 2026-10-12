@@ -1,0 +1,68 @@
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+  overflow: hidden;
+  background: transparent;
+  cursor: crosshair;
+  user-select: none;
+  font: 13px/1.5 "Segoe UI", system-ui, "Microsoft YaHei", sans-serif;
+}
+
+/* The frozen screen: dimmed underneath, and shown at full brightness inside the selection. */
+.shot {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+  opacity: 0.42;
+}
+
+.bright {
+  position: fixed;
+  inset: 0;
+  clip-path: inset(100% 0 0 0);
+}
+
+.bright img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: fill;
+}
+
+.box {
+  position: fixed;
+  border: 1px solid #c8aa6e;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6), inset 0 0 0 1px rgba(0, 0, 0, 0.35);
+  pointer-events: none;
+}
+
+.size {
+  position: fixed;
+  padding: 2px 7px;
+  border-radius: 7px;
+  background: rgba(10, 13, 18, 0.9);
+  color: #e9eef4;
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.hint {
+  position: fixed;
+  left: 50%;
+  bottom: 28px;
+  transform: translateX(-50%);
+  padding: 7px 14px;
+  border: 1px solid rgba(200, 170, 110, 0.35);
+  border-radius: 10px;
+  background: rgba(10, 13, 18, 0.85);
+  color: #e9eef4;
+  white-space: nowrap;
+}

@@ -10,6 +10,11 @@
   box-sizing: border-box;
 }
 
+/* `display: flex` on .notice and .shot beats the hidden attribute's `display: none`, so hidden means nothing without this. */
+[hidden] {
+  display: none !important;
+}
+
 html,
 body {
   height: 100%;
@@ -127,7 +132,7 @@ body {
 
 textarea {
   flex: 1;
-  min-height: 46px;
+  min-height: 44px;
   max-height: 96px;
   padding: 8px 10px;
   border: 1px solid rgba(255, 255, 255, 0.12);
@@ -183,25 +188,73 @@ button.link:hover {
   border-color: rgba(200, 170, 110, 0.5);
 }
 
-.answerWrap {
+/* The conversation: one block per exchange, scrolling to the bottom as an answer arrives. */
+.thread {
+  display: flex;
   flex: 1;
+  flex-direction: column;
+  gap: 12px;
   min-height: 0;
   overflow-y: auto;
   padding-right: 4px;
   user-select: text;
 }
 
-.answerWrap::-webkit-scrollbar {
+.thread::-webkit-scrollbar {
   width: 8px;
 }
 
-.answerWrap::-webkit-scrollbar-thumb {
+.thread::-webkit-scrollbar-thumb {
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.14);
 }
 
+.turn {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.q {
+  align-self: flex-start;
+  max-width: 92%;
+  padding: 5px 10px;
+  border: 1px solid rgba(90, 150, 220, 0.35);
+  border-radius: 10px;
+  background: rgba(46, 139, 255, 0.13);
+  word-break: break-word;
+}
+
+.a {
+  padding-left: 8px;
+  border-left: 2px solid rgba(255, 255, 255, 0.09);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.a b {
+  color: #ffe0a3;
+}
+
+.a code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  font-family: Consolas, monospace;
+  font-size: 12px;
+}
+
+.a.error {
+  border-left-color: rgba(255, 120, 120, 0.5);
+  color: #ffb4b4;
+}
+
+.wait,
+.stopped {
+  color: var(--dim);
+}
+
 .thinking {
-  margin-bottom: 8px;
   color: var(--dim);
   font-size: 12px;
 }
@@ -211,37 +264,12 @@ button.link:hover {
 }
 
 .reasoning {
-  max-height: 120px;
+  max-height: 110px;
   overflow-y: auto;
   margin-top: 4px;
   padding-left: 8px;
   border-left: 2px solid rgba(255, 255, 255, 0.12);
   white-space: pre-wrap;
-}
-
-.answer {
-  white-space: pre-wrap;
-  word-break: break-word;
-}
-
-.answer b {
-  color: #ffe0a3;
-}
-
-.answer code {
-  padding: 1px 4px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.1);
-  font-family: Consolas, monospace;
-  font-size: 12px;
-}
-
-.answer.error {
-  color: #ffb4b4;
-}
-
-.answer .wait {
-  color: var(--dim);
 }
 
 .foot {

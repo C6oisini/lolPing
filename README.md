@@ -74,15 +74,18 @@ The wheel, from the top going clockwise: Danger, Push, On My Way, All In, Assist
 
 Hold **Alt**, drag onto the slice with the **AI** sparkle icon (upper left of the wheel, the ninth slice) and let go:
 
-1. lolPing takes its overlays off the screen first, then captures that display (JPEG, long edge scaled to 1600 px, roughly 300 KB).
-2. A question window opens in the middle of that display with the screenshot in the corner. Type a question and press **Enter** (**Shift + Enter** for a new line, **Esc** to close); pressing Enter with an empty box asks "This is my game right now. What should I do next?".
-3. The answer streams into the same window: scroll it, select it, or copy it. A reasoning chain, when the model produces one, stays folded under "Thinking…". Wheel gestures are paused while the window is open.
+1. lolPing takes its overlays off the screen first, then captures that display.
+2. The screen **freezes** for you to **drag out the area** you want: the selection stays bright, the rest dims, and the size follows the box. Let go to carry on; a plain **click** (or Enter) sends the whole display, and **Esc** or a right-click drops the gesture. **Settings → Ask AI → Choose the area each time** turns it off and always sends the whole display.
+3. A question window opens with the screenshot (or the crop) in the corner. Type and press **Enter** (**Shift+Enter** for a new line, **Esc** to close); pressing Enter with an empty box asks "what should I do next?".
+4. The answer streams in below: scroll it, select it, or copy it. A reasoning chain, when the model produces one, stays folded under "Thinking…".
+5. **Follow-ups continue the same conversation** in that window; the earlier exchanges go back to the model with the new question. The screenshot rides along with the first turn only, so it is never uploaded twice. **New chat** forgets the context, and picking the AI slice again means a new screenshot and a new conversation. Wheel gestures are paused while the window is open.
 
 It calls DeepSeek's multimodal model (`deepseek-flash`, V4.1 Flash) by default. **Settings → Ask AI** holds the key and the endpoint:
 
 - **DeepSeek API key:** from [platform.deepseek.com](https://platform.deepseek.com). It is stored in `settings.json` in the clear, like the room code, and is used only for these questions.
 - **Model / endpoint:** `deepseek-flash` and `https://api.deepseek.com` by default; any OpenAI-compatible `/chat/completions` works (a relay, a local server). The screenshot goes as an `image_url` base64 data URL.
 - **System prompt:** empty uses the built-in one, in the interface language.
+- **Choose the area each time:** on by default: the frozen screen waits for a dragged box. Off sends the whole display. Either way the picture that goes out is scaled to a 1600 px long edge, so the upload stays small.
 
 Questions run in the non-thinking mode (`thinking: {"type": "disabled"}`), because a game answer is wanted now; an endpoint that doesn't know the field gets the same request without it. The request goes straight out, ignoring the system proxy, and falls back to it when nothing can be reached directly. Privacy: the screenshot and your question go to the endpoint you configure.
 

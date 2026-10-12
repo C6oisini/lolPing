@@ -1,11 +1,11 @@
 import { Input, Textarea } from '@fluentui/react-components';
-import { Bot24Regular, DocumentText24Regular, Key24Regular, Server24Regular } from '@fluentui/react-icons';
+import { Bot24Regular, DocumentText24Regular, Key24Regular, Server24Regular, Crop24Regular } from '@fluentui/react-icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DEFAULT_ASK_BASE_URL, DEFAULT_ASK_MODEL } from '../../../shared/askAi';
 import type { Settings } from '../../../shared/settings';
 import { useText } from '../text';
 import type { Update } from '../useAppState';
-import { SettingRow } from './rows';
+import { SettingRow, SwitchRow } from './rows';
 
 /**
  * A text setting edited locally and saved on Enter or when the field loses focus: sending every keystroke would write
@@ -80,6 +80,8 @@ export function AskSection({ settings: s, update, trigger }: { settings: Setting
         value={s.askAiBaseUrl} placeholder={DEFAULT_ASK_BASE_URL} width={260} onSave={(askAiBaseUrl) => void update({ askAiBaseUrl })} />
       <PromptRow title={t.askPrompt} description={t.askPromptDesc} placeholder={t.askPromptPlaceholder}
         value={s.askAiPrompt} onSave={(askAiPrompt) => void update({ askAiPrompt })} />
+      <SwitchRow icon={<Crop24Regular />} title={t.askSelectRegion} description={t.askSelectRegionDesc}
+        checked={s.askAiSelectRegion} onChange={(v) => void update({ askAiSelectRegion: v })} />
       <p className="desc roomNote">{t.askShareNote}</p>
     </>
   );

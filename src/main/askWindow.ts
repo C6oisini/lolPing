@@ -1,6 +1,6 @@
 import { BrowserWindow, clipboard, ipcMain, screen, type Display } from 'electron';
 import { ASK_CH } from '../shared/askChannels';
-import { askDefaultPrompt, type AskChunk, type AskContext, type AskImage, type AskState } from '../shared/askAi';
+import { askDefaultPrompt, type AskChunk, type AskContext, type AskImage, type AskState, type AskTurn } from '../shared/askAi';
 import type { Lang } from '../shared/i18n';
 import { AskCancelled, AskTimeout, streamAsk } from './askAi';
 import { loadPage, pageUrl, preloadPath } from './paths';
@@ -21,6 +21,8 @@ let deps: AskDeps | null = null;
 let win: BrowserWindow | null = null;
 let context: AskContext | null = null;
 let state: AskState = { status: 'idle' };
+/** What has been asked and answered about this screenshot: a new screenshot starts a new conversation. */
+let history: AskTurn[] = [];
 /** The answer in flight, if any. */
 let running: AbortController | null = null;
 
@@ -87,6 +89,8 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
   if (existing) {
     existing.setBounds(placeOn(display));
     stopAnswer();
+    // A new screenshot is a new question about a new moment: the old conversation would only confuse the model.
+    history = [];
     setState({ status: 'idle' });
     send(ASK_CH.context, context);
     existing.show();
@@ -148,7 +152,7 @@ export function destroyAskWindow(): void {
   if (w) w.destroy();
 }
 
-/** Asks about the current screenshot. An empty question is filled in by the window before it gets here. */
+/** Asks about the current screenshot, following on from the exchanges already made. An empty question is filled in by the window. */
 async function submit(question: string): Promise<void> {
   if (!deps || !context || !askWindow()) return;
   const s = deps.store.get();
@@ -159,6 +163,8 @@ async function submit(question: string): Promise<void> {
   stopAnswer();
   const ctrl = new AbortController();
   running = ctrl;
+  const asked = history;
+  let answer = '';
   setState({ status: 'streaming' });
   try {
     await streamAsk({
@@ -166,19 +172,31 @@ async function submit(question: string): Promise<void> {
       baseUrl: s.askAiBaseUrl,
       model: s.askAiModel,
       system: s.askAiPrompt || askDefaultPrompt(context.lang),
+      history: asked,
       question,
       image: context.image?.dataUrl ?? null,
       onChunk: (c: AskChunk) => {
+        if (c.kind === 'answer') answer += c.text;
         if (running === ctrl) send(ASK_CH.delta, c);
       },
       signal: ctrl.signal,
     });
-    if (running === ctrl) setState({ status: 'done' });
+    if (running === ctrl) {
+      // What the model is told matches what the window shows, so a follow-up has the same context the user can read.
+      history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+      setState({ status: 'done' });
+    }
   } catch (err) {
     if (running !== ctrl) return; // replaced or cancelled: its own state already won
-    if (err instanceof AskCancelled) setState({ status: 'idle' });
-    else if (err instanceof AskTimeout) setState({ status: 'error', error: 'timeout' });
-    else setState({ status: 'error', error: (err as Error).message });
+    if (err instanceof AskCancelled) {
+      // A stopped answer is kept in the transcript and in the context: the next question builds on what was said.
+      if (answer.length > 0) history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+      setState({ status: 'idle' });
+    } else if (err instanceof AskTimeout) {
+      setState({ status: 'error', error: 'timeout' });
+    } else {
+      setState({ status: 'error', error: (err as Error).message });
+    }
   } finally {
     if (running === ctrl) running = null;
   }
@@ -193,6 +211,11 @@ export function installAskIpc(d: AskDeps): void {
     setState({ status: 'idle' });
   });
   ipcMain.handle(ASK_CH.close, () => closeAskWindow());
+  ipcMain.handle(ASK_CH.clear, () => {
+    stopAnswer();
+    history = [];
+    setState({ status: 'idle' });
+  });
   ipcMain.handle(ASK_CH.copy, (_e, raw: unknown) => {
     if (typeof raw === 'string' && raw.length > 0) void clipboard.writeText(raw.slice(0, 100_000)).catch(() => undefined);
   });

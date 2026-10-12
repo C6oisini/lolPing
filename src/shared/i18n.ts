@@ -294,6 +294,14 @@ const en = {
   askPrompt: 'System prompt',
   askPromptDesc: 'Leave it empty for the built-in prompt, which follows the interface language.',
   askPromptPlaceholder: 'Leave empty to use the built-in prompt',
+  askSelectRegion: 'Choose the area each time',
+  askSelectRegionDesc: 'Freezes the screen and takes a dragged box; a plain click sends the whole display',
+  askNewChat: 'New chat',
+  askFollowUp: 'Ask a follow-up…',
+  askStopped: 'Stopped.',
+  askTurnFailed: 'This turn failed.',
+  askPickHint: 'Drag to select · click for the whole display · Enter confirms · Esc cancels',
+  askPickWhole: 'Whole display',
 };
 
 export type Strings = typeof en;
@@ -569,6 +577,14 @@ const zh: Strings = {
   askPrompt: '系统提示词',
   askPromptDesc: '留空则使用内置提示词（跟随界面语言）。',
   askPromptPlaceholder: '留空使用内置提示词',
+  askSelectRegion: '每次划框选区域',
+  askSelectRegionDesc: '冻结画面后拖出要发送的区域；直接单击则发送整屏',
+  askNewChat: '新对话',
+  askFollowUp: '继续追问…',
+  askStopped: '已停止。',
+  askTurnFailed: '这一轮失败了。',
+  askPickHint: '拖动选择区域 · 单击截整屏 · 回车确认 · Esc 取消',
+  askPickWhole: '整屏',
 };
 
 /** Wording that differs on macOS: menu bar instead of tray, Finder, login items, ⌃ ⌥ ⌘. */

@@ -1,4 +1,4 @@
-import { app, clipboard, dialog, Menu, powerMonitor, screen, shell, systemPreferences } from 'electron';
+import { app, clipboard, dialog, Menu, nativeImage, powerMonitor, screen, shell, systemPreferences } from 'electron';
 import { randomBytes, randomInt } from 'node:crypto';
 import { userInfo } from 'node:os';
 import { join } from 'node:path';
@@ -21,9 +21,10 @@ import { RELAYS } from './relays';
 import { RelayTransport } from './relayTransport';
 import { OverlayManager, type AskedAt, type SharedEmote, type SharedPing } from './overlayManager';
 import { assetPath, buildResourcePath, helperExePath, IS_MAC, PLATFORM, settingsDir } from './paths';
+import { destroyPickWindow, installPickIpc, pickRegion } from './pickWindow';
 import { deriveRoomKeys } from './roomCrypto';
 import { RoomManager, type RoomToast } from './roomManager';
-import { captureDisplay } from './screenshot';
+import { askImageOf, captureDisplay, cropAskImage, type Capture } from './screenshot';
 import { registerSettingsIpc } from './settingsIpc';
 import { SettingsStore } from './settingsStore';
 import { onSettingsWindowGone, openSettingsWindow, settingsWindow } from './settingsWindow';
@@ -391,25 +392,60 @@ function start(): void {
 
   /**
    * Ask AI: the wheel's extra slice was chosen. The overlays come off the screen first (a wheel or a ping still being
-   * drawn would end up in the picture), the display is captured, and the question window opens on it. A failed capture
-   * still opens the window: the question can be asked without the screenshot.
+   * drawn would end up in the picture), the display is captured, and — when the setting asks for it — the frozen screen
+   * is shown for a region to be dragged out. A failed capture still opens the window: the question can be asked
+   * without the screenshot.
    */
   const ASK_CAPTURE_DELAY_MS = 140;
+  /**
+   * Development only, and in the spirit of LOLPING_RELAYS: LOLPING_ASK_TEST_IMAGE points at a picture to use instead
+   * of capturing the screen, so the flow can be tried with no game (or no usable screen) in front. Packaged builds
+   * never look at it.
+   */
+  const devCapture = (): Capture | null => {
+    const file = app.isPackaged ? undefined : process.env.LOLPING_ASK_TEST_IMAGE;
+    if (!file) return null;
+    const image = nativeImage.createFromPath(file);
+    if (image.isEmpty()) return null;
+    const bounds = screen.getPrimaryDisplay().bounds;
+    return { image, css: { width: bounds.width, height: bounds.height } };
+  };
   const startAsk = async (displayId: number): Promise<void> => {
     overlays.cancelWheel();
     overlays.hideForCapture();
-    let image: AskImage | null = null;
+    let capture: Capture | null = null;
     try {
       await new Promise((resolve) => setTimeout(resolve, ASK_CAPTURE_DELAY_MS));
-      image = await captureDisplay(displayId);
+      capture = devCapture() ?? (await captureDisplay(displayId));
     } catch (err) {
       console.warn('[ask]', err);
     } finally {
       overlays.showForCapture();
     }
+    let image: AskImage | null = null;
+    if (capture) {
+      if (store.get().askAiSelectRegion) {
+        // The picker covers the screen: keep gestures suspended, exactly as the question window does.
+        const before = asking;
+        asking = true;
+        syncSuspend();
+        const picked = await pickRegion(displayId, capture, text().lang);
+        if (picked.kind === 'cancelled') {
+          asking = before;
+          syncSuspend();
+          return;
+        }
+        image = cropAskImage(capture, picked.rect);
+      } else {
+        image = askImageOf(capture.image);
+      }
+    }
     openAskWindow({ displayId, image, imageFailed: image === null, lang: text().lang });
   };
-  overlays.on('asked', (at: AskedAt) => void startAsk(at.displayId));
+  overlays.on('asked', (at: AskedAt) => {
+    // The window reports its own failures; anything thrown here would otherwise vanish without a trace.
+    startAsk(at.displayId).catch((err) => console.warn('[ask]', err));
+  });
   installAskIpc({
     store,
     openSettings: () => openSettingsWindow('ai'),
@@ -418,6 +454,7 @@ function start(): void {
       syncSuspend();
     },
   });
+  installPickIpc();
 
   bridge.send(configCommand(settings, enabled));
   if (trusted()) bridge.start();
@@ -450,6 +487,7 @@ function start(): void {
     tray.destroy();
     overlays.destroy();
     destroyAskWindow();
+    destroyPickWindow();
     void Promise.allSettled([bridge.stop(), store.flush(), lan.whenClosed(), relay.whenClosed()]).then(() => app.exit(0));
   });
 }

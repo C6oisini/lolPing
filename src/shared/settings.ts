@@ -77,6 +77,8 @@ export interface Settings {
   askAiModel: string;
   /** Extra instructions for the model. Empty uses the built-in prompt for the interface language. */
   askAiPrompt: string;
+  /** Ask for the area to send: the picker freezes the display and takes a dragged box, or the whole display on a click. */
+  askAiSelectRegion: boolean;
   /** Look for a new version on launch and every few hours. Checking by hand always works. */
   autoUpdateCheck: boolean;
   /** The newest version already announced with a toast, as x.y.z, so each version is announced once. */
@@ -124,6 +126,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askAiBaseUrl: DEFAULT_ASK_BASE_URL,
   askAiModel: DEFAULT_ASK_MODEL,
   askAiPrompt: '',
+  askAiSelectRegion: true,
   autoUpdateCheck: true,
   updateNotifiedVersion: null,
 };
@@ -139,7 +142,7 @@ export const LIMITS = {
 
 type NumKey = keyof typeof LIMITS;
 type BoolKey = 'enabledOnStart' | 'clickPing' | 'gameCheck' | 'muted' | 'tickSound' | 'launchAtStartup' | 'allowInternet' | 'rejoinRoom' | 'roomMuted'
-  | 'emoteClick' | 'emoteSound' | 'autoUpdateCheck';
+  | 'emoteClick' | 'emoteSound' | 'autoUpdateCheck' | 'askAiSelectRegion';
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isVk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 254;
@@ -281,6 +284,7 @@ export function normalizeSettings(raw: unknown, platform: Platform = 'win', iden
     askAiBaseUrl: baseUrl(r.askAiBaseUrl),
     askAiModel: text(r.askAiModel, DEFAULT_ASK_MODEL, 100) || DEFAULT_ASK_MODEL,
     askAiPrompt: text(r.askAiPrompt, '', 2000),
+    askAiSelectRegion: bool(r.askAiSelectRegion, 'askAiSelectRegion'),
     autoUpdateCheck: bool(r.autoUpdateCheck, 'autoUpdateCheck'),
     updateNotifiedVersion: isVersion(r.updateNotifiedVersion) ? r.updateNotifiedVersion : null,
   };

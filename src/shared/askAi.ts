@@ -82,6 +82,83 @@ export interface AskState {
   error?: string;
 }
 
+/** One finished exchange. The window keeps the same list the model is sent, so a follow-up has the context. */
+export interface AskTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+/** A message in the request body: the plain-text turns, and the one that carries the screenshot. */
+export interface AskMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string | Array<Record<string, unknown>>;
+}
+
+const imagePart = (url: string): Record<string, unknown> => ({ type: 'image_url', image_url: { url, detail: 'high' } });
+
+/**
+ * The request messages for a question: the system prompt, every finished turn, then this question. The screenshot is
+ * attached to the first question of the conversation only — later turns refer back to it, and repeating it would send
+ * the same picture (and its tokens) again on every follow-up.
+ */
+export function askMessages(system: string, history: readonly AskTurn[], question: string, image: string | null): AskMessage[] {
+  const messages: AskMessage[] = [{ role: 'system', content: system }];
+  let attached = image === null;
+  for (const turn of history) {
+    if (turn.role === 'user' && !attached) {
+      attached = true;
+      messages.push({ role: 'user', content: [{ type: 'text', text: turn.text }, imagePart(image as string)] });
+    } else {
+      messages.push({ role: turn.role, content: turn.text });
+    }
+  }
+  messages.push(attached ? { role: 'user', content: question } : { role: 'user', content: [{ type: 'text', text: question }, imagePart(image as string)] });
+  return messages;
+}
+
+/** A rectangle in the display's own CSS pixels: what the picker reports and the crop is measured from. */
+export interface PickRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/** The selection in the capture's pixels, which are not the display's CSS pixels on a scaled display. */
+export function selectionToPixels(
+  rect: PickRect,
+  css: { width: number; height: number },
+  image: { width: number; height: number },
+): { x: number; y: number; width: number; height: number } {
+  const sx = css.width > 0 ? image.width / css.width : 1;
+  const sy = css.height > 0 ? image.height / css.height : 1;
+  const x = Math.max(0, Math.min(image.width - 1, Math.round(rect.x * sx)));
+  const y = Math.max(0, Math.min(image.height - 1, Math.round(rect.y * sy)));
+  return {
+    x,
+    y,
+    width: Math.max(1, Math.min(image.width - x, Math.round(rect.width * sx))),
+    height: Math.max(1, Math.min(image.height - y, Math.round(rect.height * sy))),
+  };
+}
+
+/** What the picker came back with: a box (null = the whole display), or nothing when the gesture was cancelled. */
+export type PickResult = { kind: 'area'; rect: PickRect | null } | { kind: 'cancelled' };
+
+/** What the region picker needs: the frozen screenshot of one display, and the language for its hint. */
+export interface PickContext {
+  lang: Lang;
+  image: AskImage;
+}
+
+/** window.pickApi in the picker renderer. */
+export interface PickApi {
+  getContext(): Promise<PickContext>;
+  /** `rect` is the selection in the display's CSS pixels; null asks for the whole display. */
+  done(rect: PickRect | null): Promise<void>;
+  cancel(): Promise<void>;
+}
+
 /** window.askApi in the ask renderer. */
 export interface AskApi {
   getContext(): Promise<AskContext>;
@@ -89,6 +166,8 @@ export interface AskApi {
   submit(question: string): Promise<void>;
   /** Stops the answer in flight. */
   cancel(): Promise<void>;
+  /** Forgets the conversation so far, on both sides. */
+  clear(): Promise<void>;
   close(): Promise<void>;
   copy(text: string): Promise<void>;
   /** Opens Settings on the Ask AI section, for the API key. */

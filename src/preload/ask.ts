@@ -12,6 +12,7 @@ const api: AskApi = {
   getContext: () => ipcRenderer.invoke(ASK_CH.context),
   submit: (question) => ipcRenderer.invoke(ASK_CH.submit, question),
   cancel: () => ipcRenderer.invoke(ASK_CH.cancel),
+  clear: () => ipcRenderer.invoke(ASK_CH.clear),
   close: () => ipcRenderer.invoke(ASK_CH.close),
   copy: (text) => ipcRenderer.invoke(ASK_CH.copy, text),
   openSettings: () => ipcRenderer.invoke(ASK_CH.openSettings),

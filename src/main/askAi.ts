@@ -1,5 +1,5 @@
 import { session, type Session } from 'electron';
-import { ASK_IDLE_TIMEOUT_MS, ASK_MAX_TOKENS, ASK_TOTAL_TIMEOUT_MS, type AskChunk } from '../shared/askAi';
+import { askMessages, ASK_IDLE_TIMEOUT_MS, ASK_MAX_TOKENS, ASK_TOTAL_TIMEOUT_MS, type AskChunk, type AskTurn } from '../shared/askAi';
 
 export interface AskCall {
   apiKey: string;
@@ -7,6 +7,8 @@ export interface AskCall {
   model: string;
   /** The system prompt: the settings' own, or the built-in one for the interface language. */
   system: string;
+  /** The exchanges already made in this conversation, oldest first. */
+  history: readonly AskTurn[];
   question: string;
   /** The screenshot as a data URL, or null when there is none. */
   image: string | null;
@@ -131,18 +133,12 @@ function post(url: string, body: unknown, call: AskCall, sess: Session, signal: 
  */
 export async function streamAsk(call: AskCall): Promise<void> {
   const url = `${call.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-  const content: unknown[] = [{ type: 'text', text: call.question }];
-  if (call.image) content.push({ type: 'image_url', image_url: { url: call.image, detail: 'high' } });
-  const messages = [
-    { role: 'system', content: call.system },
-    { role: 'user', content },
-  ];
-  // A game answer is wanted now, not after a chain of thought: the non-thinking mode is both faster and cheaper.
   const body: Record<string, unknown> = {
     model: call.model,
-    messages,
+    messages: askMessages(call.system, call.history, call.question, call.image),
     stream: true,
     max_tokens: ASK_MAX_TOKENS,
+    // A game answer is wanted now, not after a chain of thought: the non-thinking mode is both faster and cheaper.
     thinking: { type: 'disabled' },
   };
 

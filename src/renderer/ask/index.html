@@ -15,6 +15,7 @@
         <span class="spark"></span>
         <b id="title">Ask AI</b>
         <span class="model" id="model"></span>
+        <button class="link" id="newChat" type="button">New chat</button>
         <button class="icon" id="close" type="button">✕</button>
       </header>
       <div class="shot" id="shotRow" hidden>
@@ -28,16 +29,10 @@
         </div>
         <button class="link" id="noticeAction" type="button" hidden></button>
       </div>
+      <div class="thread" id="thread"></div>
       <div class="askRow">
         <textarea id="question" rows="2" spellcheck="false"></textarea>
         <button class="primary" id="send" type="button">Ask</button>
-      </div>
-      <div class="answerWrap" id="answerWrap">
-        <details class="thinking" id="thinking" hidden>
-          <summary id="thinkingLabel"></summary>
-          <div class="reasoning" id="reasoning"></div>
-        </details>
-        <div class="answer" id="answer"></div>
       </div>
       <footer class="foot">
         <div class="footRow">
