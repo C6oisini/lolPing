@@ -30,23 +30,14 @@ export const ASK_IDLE_TIMEOUT_MS = 30_000;
 export const ASK_MAX_TOKENS = 900;
 
 /**
- * The built-in instruction, used when the settings' prompt is empty. It follows the interface language, and is written
- * for a screenshot of a game in progress: short, concrete and in the player's language.
+ * The built-in instruction, used when the settings' prompt is empty. It depends only on the interface language: the
+ * screenshot is whatever the user was looking at, so the default asks for a detailed answer from the picture rather
+ * than assuming a game.
  */
 export function askDefaultPrompt(lang: Lang): string {
   return lang === 'zh-CN'
-    ? [
-      '你是一个英雄联盟实时助手。用户会给你一张游戏截图，可能附带一句提问。',
-      '看清截图里的局势：双方阵容、血量蓝量、装备、兵线、视野、地图上的敌人位置和时间。',
-      '用简体中文回答，直接给结论和下一步该做什么，最多 5 行，不要复述截图内容，不要客套话。',
-      '信息看不清就直说看不清，不要编造。',
-    ].join('\n')
-    : [
-      'You are a real-time League of Legends assistant. The user sends you a screenshot of a game in progress, usually with a question.',
-      'Read the situation from the screenshot: both team compositions, health and mana, items, minion waves, vision, enemy positions and the game clock.',
-      'Answer in at most 5 lines, in the language of the question: give the call and the next concrete action. Do not describe the screenshot back, and skip the pleasantries.',
-      'If something is unreadable, say so instead of guessing.',
-    ].join('\n');
+    ? '你是一个问答助手，根据图片，详细回答问题'
+    : 'You are a Q&A assistant. Answer the question in detail based on the image.';
 }
 
 /** A capture of one display, ready to be sent: a JPEG data URL and its pixel size. */

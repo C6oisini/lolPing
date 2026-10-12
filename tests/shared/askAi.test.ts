@@ -130,9 +130,9 @@ describe('Ask AI settings', () => {
 });
 
 describe('askDefaultPrompt', () => {
-  it('answers in the interface language', () => {
-    expect(askDefaultPrompt('zh-CN')).toContain('简体中文');
-    expect(askDefaultPrompt('en')).toContain('League of Legends');
+  it('asks for a detailed answer from the picture, in the interface language', () => {
+    expect(askDefaultPrompt('zh-CN')).toContain('根据图片');
+    expect(askDefaultPrompt('en')).toContain('based on the image');
     expect(askDefaultPrompt('zh-CN')).not.toBe(askDefaultPrompt('en'));
   });
 });
