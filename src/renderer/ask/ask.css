@@ -304,6 +304,36 @@ button.link:hover {
   white-space: pre;
 }
 
+/* KaTeX brings its own stylesheet (and its fonts); these rules only size it for the pane and let a wide formula
+   scroll instead of stretching the window. The selectors carry .a so they win whatever order the two sheets load in. */
+.a .katex {
+  font-size: 1.05em;
+  color: inherit;
+}
+
+.a .math-block {
+  margin: 6px 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.a .math-block:last-child {
+  margin-bottom: 0;
+}
+
+.a .katex-display {
+  margin: 0;
+}
+
+.a .katex-error {
+  padding: 1px 4px;
+  background: rgba(255, 120, 120, 0.12);
+  border-radius: 4px;
+  font-family: Consolas, monospace;
+  font-size: 12px;
+  color: #ffb4b4;
+}
+
 .a table {
   margin: 0 0 6px;
   border-collapse: collapse;

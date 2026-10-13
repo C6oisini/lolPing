@@ -1,3 +1,4 @@
+import 'katex/dist/katex.min.css';
 import type { AskChunk, AskContext, AskState } from '../../shared/askAi';
 import { strings, type Strings } from '../../shared/i18n';
 import { renderMarkdown } from './markdown';
