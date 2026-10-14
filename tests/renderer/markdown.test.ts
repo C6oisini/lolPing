@@ -39,7 +39,8 @@ describe('renderMarkdown', () => {
 
   it('renders a pipe table', () => {
     const html = renderMarkdown('| 装备 | 价格 |\n| --- | --- |\n| 破败 | 3300 |');
-    expect(html).toBe('<table><thead><tr><th>装备</th><th>价格</th></tr></thead><tbody><tr><td>破败</td><td>3300</td></tr></tbody></table>');
+    // Wrapped in a scroller, so a table wider than the card scrolls instead of stretching the window.
+    expect(html).toBe('<div class="table-wrap"><table><thead><tr><th>装备</th><th>价格</th></tr></thead><tbody><tr><td>破败</td><td>3300</td></tr></tbody></table></div>');
   });
 
   it('keeps a single newline as a line break, and a blank line as a new paragraph', () => {

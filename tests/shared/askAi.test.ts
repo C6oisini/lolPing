@@ -121,6 +121,19 @@ describe('Ask AI settings', () => {
     expect(normalizeSettings({ askAiModel: 42 }).askAiModel).toBe(DEFAULT_ASK_MODEL);
   });
 
+  it('remembers the question window size, within the range its layout survives', () => {
+    expect(normalizeSettings({}).askAiWindowWidth).toBe(680);
+    expect(normalizeSettings({}).askAiWindowHeight).toBe(540);
+    expect(normalizeSettings({ askAiWindowWidth: 940, askAiWindowHeight: 780 })).toMatchObject({ askAiWindowWidth: 940, askAiWindowHeight: 780 });
+    // Anything a drag or a hand-edited file could produce is clamped to what the card can still lay out.
+    expect(normalizeSettings({ askAiWindowWidth: 100 }).askAiWindowWidth).toBe(360);
+    expect(normalizeSettings({ askAiWindowHeight: 100 }).askAiWindowHeight).toBe(300);
+    expect(normalizeSettings({ askAiWindowWidth: 99999 }).askAiWindowWidth).toBe(2400);
+    expect(normalizeSettings({ askAiWindowHeight: 99999 }).askAiWindowHeight).toBe(1600);
+    expect(normalizeSettings({ askAiWindowWidth: 'wide' }).askAiWindowWidth).toBe(680);
+    expect(normalizeSettings({ askAiWindowHeight: null }).askAiWindowHeight).toBe(540);
+  });
+
   it('only accepts an http(s) endpoint, and falls back to DeepSeek for anything else', () => {
     expect(normalizeSettings({ askAiBaseUrl: 'http://localhost:11434/v1' }).askAiBaseUrl).toBe('http://localhost:11434/v1');
     for (const bad of ['ftp://example.com', 'not a url', 'file:///etc/passwd', '', 7, null]) {

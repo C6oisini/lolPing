@@ -132,6 +132,7 @@ body {
 
 textarea {
   flex: 1;
+  min-width: 0;
   min-height: 44px;
   max-height: 96px;
   padding: 8px 10px;
@@ -228,7 +229,9 @@ button.link:hover {
 .a {
   padding-left: 8px;
   border-left: 2px solid rgba(255, 255, 255, 0.09);
+  /* The card is resizable, so the text has to survive being squeezed: break long words, and let wide blocks scroll. */
   word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* The answer's Markdown: small, tight blocks, because these answers are a few lines and the pane is short. */
@@ -334,8 +337,14 @@ button.link:hover {
   color: #ffb4b4;
 }
 
-.a table {
+/* A table wider than the card scrolls inside it rather than widening the card or the window. */
+.a .table-wrap {
   margin: 0 0 6px;
+  overflow-x: auto;
+}
+
+.a table {
+  margin: 0;
   border-collapse: collapse;
   font-size: 12px;
 }

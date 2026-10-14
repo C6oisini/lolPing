@@ -58,10 +58,12 @@ function isAskPage(url: string): boolean {
   }
 }
 
-/** Where to put the card: centred on the display the gesture happened on, a little above the middle. */
+/** Where to put the card: centred on the display the gesture happened on, a little above the middle, at the size the
+ *  question window was last dragged to (clamped to the display, so a size from a bigger screen still fits). */
 function placeOn(display: Display): { x: number; y: number; width: number; height: number } {
-  const width = Math.max(420, Math.min(680, display.bounds.width - 80));
-  const height = Math.max(320, Math.min(540, display.bounds.height - 80));
+  const s = deps?.store.get();
+  const width = Math.min(s?.askAiWindowWidth ?? 680, display.bounds.width - 40);
+  const height = Math.min(s?.askAiWindowHeight ?? 540, display.bounds.height - 40);
   return {
     width,
     height,
@@ -91,7 +93,14 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
   history = [];
   const existing = askWindow();
   if (existing) {
-    existing.setBounds(placeOn(display));
+    // Re-centre it on the display, but keep whatever size the user has dragged it to: the size is theirs, the place ours.
+    const current = existing.getBounds();
+    const placed = placeOn(display);
+    existing.setBounds({
+      ...placed,
+      width: Math.min(current.width, display.bounds.width - 40),
+      height: Math.min(current.height, display.bounds.height - 40),
+    });
     stopAnswer();
     setState({ status: 'idle' });
     send(ASK_CH.context, context);
@@ -104,7 +113,12 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
     frame: false,
     transparent: true,
     backgroundColor: '#00000000',
-    resizable: false,
+    // The card is resized by dragging its edges and corners. A frameless window still gets the frame's resize border
+    // from Windows (`thickFrame` is on by default), which is what makes those drags land on the window frame at all.
+    // The floors are the size at which the card's own layout still works; the settings clamp to the same numbers.
+    resizable: true,
+    minWidth: 360,
+    minHeight: 300,
     movable: true,
     minimizable: false,
     maximizable: false,
@@ -125,6 +139,15 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
     if (!isAskPage(event.url)) event.preventDefault();
   });
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Remember the size the card was left at, so the next question opens at that size. Saved when the window closes
+  // rather than on every resize event: a drag emits a stream of them, and each save rewrites the settings file.
+  w.on('close', () => {
+    const { width, height } = w.getBounds();
+    const s = deps?.store.get();
+    if (s && (s.askAiWindowWidth !== width || s.askAiWindowHeight !== height)) {
+      void deps?.store.update({ askAiWindowWidth: width, askAiWindowHeight: height });
+    }
+  });
   w.on('closed', () => {
     win = null;
     stopAnswer();

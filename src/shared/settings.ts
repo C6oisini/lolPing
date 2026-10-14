@@ -79,6 +79,9 @@ export interface Settings {
   askAiPrompt: string;
   /** Ask for the area to send: the picker freezes the display and takes a dragged box, or the whole display on a click. */
   askAiSelectRegion: boolean;
+  /** The size the question window was dragged to, so the next question opens the way the last one was left. */
+  askAiWindowWidth: number;
+  askAiWindowHeight: number;
   /** Look for a new version on launch and every few hours. Checking by hand always works. */
   autoUpdateCheck: boolean;
   /** The newest version already announced with a toast, as x.y.z, so each version is announced once. */
@@ -127,6 +130,8 @@ export const DEFAULT_SETTINGS: Settings = {
   askAiModel: DEFAULT_ASK_MODEL,
   askAiPrompt: '',
   askAiSelectRegion: true,
+  askAiWindowWidth: 680,
+  askAiWindowHeight: 540,
   autoUpdateCheck: true,
   updateNotifiedVersion: null,
 };
@@ -138,6 +143,9 @@ export const LIMITS = {
   volume: { min: 0, max: 100, step: 1 },
   incomingPingLimit: { min: 0, max: 20, step: 1 },
   emoteSizePx: { min: 80, max: 300, step: 1 },
+  // The question window's floor is the size at which its own layout still works.
+  askAiWindowWidth: { min: 360, max: 2400, step: 1 },
+  askAiWindowHeight: { min: 300, max: 1600, step: 1 },
 } as const;
 
 type NumKey = keyof typeof LIMITS;
@@ -285,6 +293,8 @@ export function normalizeSettings(raw: unknown, platform: Platform = 'win', iden
     askAiModel: text(r.askAiModel, DEFAULT_ASK_MODEL, 100) || DEFAULT_ASK_MODEL,
     askAiPrompt: text(r.askAiPrompt, '', 2000),
     askAiSelectRegion: bool(r.askAiSelectRegion, 'askAiSelectRegion'),
+    askAiWindowWidth: num(r.askAiWindowWidth, 'askAiWindowWidth'),
+    askAiWindowHeight: num(r.askAiWindowHeight, 'askAiWindowHeight'),
     autoUpdateCheck: bool(r.autoUpdateCheck, 'autoUpdateCheck'),
     updateNotifiedVersion: isVersion(r.updateNotifiedVersion) ? r.updateNotifiedVersion : null,
   };

@@ -159,7 +159,8 @@ function renderBlocks(lines: string[], items: MathItem[]): string {
       while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') rows.push(cells(lines[i++]));
       const headHtml = head.map((c) => `<th>${inline(c, items)}</th>`).join('');
       const bodyHtml = rows.map((r) => `<tr>${head.map((_, n) => `<td>${inline(r[n] ?? '', items)}</td>`).join('')}</tr>`).join('');
-      out.push(`<table><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml}</tbody></table>`);
+      // The card can be dragged narrow, so a wide table gets its own scroller instead of widening the window.
+      out.push(`<div class="table-wrap"><table><thead><tr>${headHtml}</tr></thead><tbody>${bodyHtml}</tbody></table></div>`);
       continue;
     }
 
