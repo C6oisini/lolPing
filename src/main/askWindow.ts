@@ -1,11 +1,21 @@
 import { BrowserWindow, clipboard, ipcMain, screen, type Display } from 'electron';
 import { join } from 'node:path';
 import { ASK_CH } from '../shared/askChannels';
-import { askDefaultPrompt, type AskChunk, type AskContext, type AskImage, type AskState, type AskTurn } from '../shared/askAi';
+import {
+  askDefaultPrompt,
+  type AskAttach,
+  type AskChunk,
+  type AskContext,
+  type AskImage,
+  type AskState,
+  type AskTurn,
+  type StoredConversation,
+} from '../shared/askAi';
 import type { Lang } from '../shared/i18n';
 import { AskCancelled, AskTimeout, streamAsk } from './askAi';
 import { ConversationStore, isConversationId, newConversationId } from './conversationStore';
 import { loadPage, pageUrl, preloadPath, settingsDir } from './paths';
+import { storedPreviewOf } from './screenshot';
 import type { SettingsStore } from './settingsStore';
 
 export interface AskDeps {
@@ -17,6 +27,11 @@ export interface AskDeps {
    * somewhere) while the user is typing.
    */
   setAsking(on: boolean): void;
+  /**
+   * A new screenshot for the question being typed, taken by the main process (which owns the capture and the region
+   * picker) with this window taken off the screen first, so the picture is of what the user was looking at.
+   */
+  captureForAsk(): Promise<AskAttach>;
 }
 
 let deps: AskDeps | null = null;
@@ -29,12 +44,25 @@ let history: AskTurn[] = [];
 let conversationId: string | null = null;
 /** A small copy of the screenshot, for the saved conversation only: the full picture is never written down. */
 let preview: AskImage | null = null;
+/** The screenshot the next question will be asked about, if the user has taken a new one. */
+let staged: AskImage | null = null;
 /** The answer in flight, if any. */
 let running: AbortController | null = null;
 
 /** The saved conversations, opened on first use. */
 let store: ConversationStore | null = null;
 const conversations = (): ConversationStore => (store ??= new ConversationStore(join(settingsDir(), 'conversations')));
+
+/** The small copy kept with a saved conversation, made once per picture: the full screenshot is never written down. */
+const smallCopies = new WeakMap<AskImage, AskImage>();
+function smallCopy(image: AskImage): AskImage {
+  let small = smallCopies.get(image);
+  if (!small) {
+    small = storedPreviewOf(image);
+    smallCopies.set(image, small);
+  }
+  return small;
+}
 
 /** Saves what has been said so far, when the user keeps a history. Called after every turn, so the window closing
  *  (or the app being killed) cannot lose the conversation. */
@@ -47,8 +75,20 @@ function remember(): void {
     at: Date.now(),
     title: firstQuestion?.text ?? '',
     image: preview,
-    turns: history,
+    turns: history.map((t) => ({ ...t, image: t.image ? smallCopy(t.image) : null })),
   });
+}
+
+/**
+ * The turns of a saved conversation, with the conversation's own screenshot put back where it belongs. Conversations
+ * saved before a question could carry its own picture held one image for the whole chat: that was the first
+ * question's, so it goes back on the first question.
+ */
+function turnsOf(stored: StoredConversation): AskTurn[] {
+  const turns = stored.turns;
+  if (!stored.image || turns.some((t) => t.image)) return turns;
+  const first = turns.findIndex((t) => t.role === 'user');
+  return first < 0 ? turns : turns.map((t, i) => (i === first ? { ...t, image: stored.image } : t));
 }
 
 /** The ask window, if one is open and alive. */
@@ -117,6 +157,8 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
   // the new picture, which is both confusing for the model and a needless repeat of what was said before.
   history = [];
   preview = opts.preview;
+  // The first question is asked about the screenshot the slice just took; a later one can bring its own.
+  staged = opts.image;
   conversationId = newConversationId();
   const existing = askWindow();
   if (existing) {
@@ -180,6 +222,7 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
     stopAnswer();
     // The conversation lived in this window: closing it drops what was said rather than keeping it for the next one.
     history = [];
+    staged = null;
     context = null;
     state = { status: 'idle' };
     deps?.setAsking(false);
@@ -219,6 +262,8 @@ async function submit(question: string): Promise<void> {
   const ctrl = new AbortController();
   running = ctrl;
   const asked = history;
+  /** The picture this question comes with: the slice's own screenshot, or one taken into the conversation since. */
+  const about = staged;
   let answer = '';
   setState({ status: 'streaming' });
   try {
@@ -229,7 +274,7 @@ async function submit(question: string): Promise<void> {
       system: s.askAiPrompt || askDefaultPrompt(context.lang),
       history: asked,
       question,
-      image: context.image?.dataUrl ?? null,
+      image: about?.dataUrl ?? null,
       onChunk: (c: AskChunk) => {
         if (c.kind === 'answer') answer += c.text;
         if (running === ctrl) send(ASK_CH.delta, c);
@@ -238,7 +283,9 @@ async function submit(question: string): Promise<void> {
     });
     if (running === ctrl) {
       // What the model is told matches what the window shows, so a follow-up has the same context the user can read.
-      history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+      // The picture stays on the turn that was asked about it: the next question is its own, unless one is taken.
+      history = [...asked, { role: 'user', text: question, image: about }, { role: 'assistant', text: answer }];
+      staged = null;
       setState({ status: 'done' });
       remember();
     }
@@ -247,7 +294,8 @@ async function submit(question: string): Promise<void> {
     if (err instanceof AskCancelled) {
       // A stopped answer is kept in the transcript and in the context: the next question builds on what was said.
       if (answer.length > 0) {
-        history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+        history = [...asked, { role: 'user', text: question, image: about }, { role: 'assistant', text: answer }];
+        staged = null;
         remember();
       }
       setState({ status: 'idle' });
@@ -271,8 +319,10 @@ async function openStored(rawId: unknown): Promise<void> {
   if (!stored || !context || !askWindow()) return;
   stopAnswer();
   conversationId = stored.id;
-  history = stored.turns;
+  history = turnsOf(stored);
   preview = stored.image;
+  // Nothing is attached to the next question yet: what the conversation was about is already on its turns.
+  staged = null;
   context = { ...context, image: stored.image, imageFailed: false };
   setState({ status: 'idle' });
   send(ASK_CH.context, context);
@@ -306,4 +356,15 @@ export function installAskIpc(d: AskDeps): void {
     if (typeof raw === 'string' && raw.length > 0) void clipboard.writeText(raw.slice(0, 100_000)).catch(() => undefined);
   });
   ipcMain.handle(ASK_CH.openSettings, () => deps?.openSettings());
+  ipcMain.handle(ASK_CH.attach, async () => {
+    if (!deps || !askWindow()) return { image: null, failed: true };
+    const shot = await deps.captureForAsk();
+    // A cancelled or failed capture leaves whatever was already attached in place: the next question is no worse off.
+    if (shot.image) staged = shot.image;
+    return shot;
+  });
+  ipcMain.handle(ASK_CH.historyRename, (_e, raw: unknown, rawTitle: unknown) => {
+    if (!isConversationId(raw)) return conversations().list();
+    return conversations().rename(raw, typeof rawTitle === 'string' ? rawTitle.slice(0, 200) : '');
+  });
 }

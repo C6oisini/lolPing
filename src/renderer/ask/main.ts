@@ -1,5 +1,5 @@
 import 'katex/dist/katex.min.css';
-import type { AskChunk, AskContext, AskState, AskTurn, ConversationSummary } from '../../shared/askAi';
+import type { AskChunk, AskContext, AskImage, AskState, AskTurn, ConversationSummary } from '../../shared/askAi';
 import { strings, type Strings } from '../../shared/i18n';
 import { renderMarkdown } from './markdown';
 
@@ -24,6 +24,7 @@ const noticeBody = el('noticeBody');
 const noticeAction = el<HTMLButtonElement>('noticeAction');
 const thread = el('thread');
 const question = el<HTMLTextAreaElement>('question');
+const attach = el<HTMLButtonElement>('attach');
 const send = el<HTMLButtonElement>('send');
 const hint = el('hint');
 const note = el('note');
@@ -33,6 +34,10 @@ let ctx: AskContext;
 let t: Strings;
 let streaming = false;
 let pending = '';
+/** A screenshot taken for the next question, waiting to be sent with it. */
+let staged: AskImage | null = null;
+/** The history as it was last drawn, to put a row back the way it was when a rename is abandoned. */
+let historyItems: ConversationSummary[] = [];
 /** The answer being streamed, and where it is being written. */
 let lastAnswer = '';
 let answerEl: HTMLElement | null = null;
@@ -64,6 +69,47 @@ function showNotice(kind: 'warn' | 'error', heading: string, body: string, actio
     noticeAction.hidden = false;
     noticeAction.textContent = action.label;
     noticeAction.onclick = action.run;
+  }
+}
+
+/** The picture the window is asking about, with a line saying what becomes of it. */
+function showShot(image: AskImage | null, note: string): void {
+  if (!image) {
+    shotRow.hidden = true;
+    return;
+  }
+  shot.src = image.dataUrl;
+  shotInfo.textContent = `${image.width} × ${image.height} · ${note}`;
+  shotRow.hidden = false;
+}
+
+/** A note in the footer's hint line for a moment, the way the copy button borrows its own label. */
+function flashHint(text: string): void {
+  hint.textContent = text;
+  setTimeout(() => {
+    hint.textContent = t.askHint;
+  }, 1600);
+}
+
+/**
+ * Takes a new screenshot for the question being typed. The window hides itself for the capture, so it comes back
+ * looking the same, with the new picture in the row above.
+ */
+async function attachShot(): Promise<void> {
+  if (streaming || !ctx.hasKey) return;
+  attach.disabled = true;
+  attach.textContent = t.askShotBusy;
+  try {
+    const shot = await window.askApi.attachScreenshot();
+    if (shot.image) {
+      staged = shot.image;
+      showShot(shot.image, t.askShotNote);
+    } else if (shot.failed) {
+      flashHint(t.askShotFailed);
+    }
+  } finally {
+    attach.disabled = !ctx.hasKey;
+    attach.textContent = t.askShot;
   }
 }
 
@@ -138,6 +184,7 @@ function when(at: number): string {
 
 /** The saved conversations: one row each — what was asked about, when, and how many turns it ran. */
 function renderHistory(items: ConversationSummary[]): void {
+  historyItems = items;
   historyList.textContent = '';
   if (items.length === 0) {
     const empty = document.createElement('p');
@@ -172,15 +219,59 @@ function renderHistory(items: ConversationSummary[]): void {
       historyPanel.hidden = true;
       void window.askApi.loadHistory(item.id);
     });
+    const rename = document.createElement('button');
+    rename.type = 'button';
+    rename.className = 'historyEdit';
+    rename.title = t.askRename;
+    rename.textContent = '✎';
+    rename.addEventListener('click', () => startRename(row, item));
     const remove = document.createElement('button');
     remove.type = 'button';
     remove.className = 'historyDelete';
     remove.title = t.askHistoryDelete;
     remove.textContent = '✕';
     remove.addEventListener('click', () => void window.askApi.removeHistory(item.id).then(renderHistory));
-    row.append(open, remove);
+    row.append(open, rename, remove);
     historyList.append(row);
   }
+}
+
+/** Renaming a row: its buttons give way to an input. Enter or leaving it saves, Escape puts the name back. */
+function startRename(row: HTMLElement, item: ConversationSummary): void {
+  const input = document.createElement('input');
+  input.className = 'historyName';
+  input.type = 'text';
+  input.maxLength = 200;
+  input.value = item.title;
+  input.placeholder = t.askDefaultQuestion;
+  row.textContent = '';
+  row.append(input);
+  input.focus();
+  input.select();
+  let settled = false;
+  const keep = (): void => {
+    if (settled) return;
+    settled = true;
+    renderHistory(historyItems);
+  };
+  const save = async (): Promise<void> => {
+    if (settled) return;
+    settled = true;
+    const name = input.value.trim();
+    renderHistory(name.length > 0 && name !== item.title ? await window.askApi.renameHistory(item.id, name) : historyItems);
+  };
+  input.addEventListener('keydown', (e) => {
+    // The window's own Escape (close) must not fire while a name is being edited.
+    e.stopPropagation();
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      void save();
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      keep();
+    }
+  });
+  input.addEventListener('blur', () => void save());
 }
 
 function openHistory(): void {
@@ -236,15 +327,14 @@ function applyContext(c: AskContext): void {
   copy.textContent = t.askCopy;
   notice.hidden = true;
   noticeAction.hidden = true;
-  shotRow.hidden = true;
   question.disabled = !c.hasKey;
-  if (c.image) {
-    shot.src = c.image.dataUrl;
-    shotInfo.textContent = `${c.image.width} × ${c.image.height} · ${t.askShareNote}`;
-    shotRow.hidden = false;
-  } else if (c.imageFailed) {
-    showNotice('warn', '', t.askNoImage);
-  }
+  attach.disabled = !c.hasKey;
+  attach.textContent = t.askShot;
+  attach.title = t.askShot;
+  // Whatever was attached before belongs to a question that is no longer on screen: the row shows the new screenshot.
+  staged = null;
+  showShot(c.image, t.askShareNote);
+  if (!c.image && c.imageFailed) showNotice('warn', '', t.askNoImage);
   if (!c.hasKey) {
     showNotice('warn', t.askNoKey, t.askNoKeyDesc, { label: t.askOpenSettings, run: () => void window.askApi.openSettings() });
   }
@@ -300,11 +390,17 @@ function submit(): void {
   }
   pending = question.value.trim() || (thread.childElementCount > 0 ? t.askFollowUp.trim() : t.askDefaultQuestion);
   question.value = '';
+  // The picture is now part of the conversation rather than waiting to be sent, and the row says so from here on.
+  if (staged) {
+    showShot(staged, t.askShareNote);
+    staged = null;
+  }
   void window.askApi.submit(pending);
 }
 
 send.addEventListener('click', submit);
 closeBtn.addEventListener('click', () => void window.askApi.close());
+attach.addEventListener('click', () => void attachShot());
 newChat.addEventListener('click', () => {
   void window.askApi.clear();
   clearThread();
@@ -327,7 +423,13 @@ question.addEventListener('keydown', (e) => {
   }
 });
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') void window.askApi.close();
+  if (e.key !== 'Escape') return;
+  // Escape backs out of the panel first, and closes the window only when there is nothing to back out of.
+  if (!historyPanel.hidden) {
+    historyPanel.hidden = true;
+    return;
+  }
+  void window.askApi.close();
 });
 window.askApi.onChunk(onChunk);
 window.askApi.onState(onState);

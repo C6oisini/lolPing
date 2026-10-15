@@ -12,7 +12,7 @@ import { formatRoomCode, parseRoomCode } from '../shared/roomCode';
 import { overlaySettings, type Settings } from '../shared/settings';
 import { updateErrorText, type UpdateState } from '../shared/update';
 import { registerAppScheme, serveAppScheme } from './appProtocol';
-import { destroyAskWindow, installAskIpc, openAskWindow } from './askWindow';
+import { askWindow, destroyAskWindow, installAskIpc, openAskWindow } from './askWindow';
 import { resolveTarget, toShared } from './displayNumbers';
 import { EmoteLibrary, resolveEmoteArt } from './emoteLibrary';
 import { InputBridge } from './inputBridge';
@@ -410,9 +410,11 @@ function start(): void {
     const bounds = screen.getPrimaryDisplay().bounds;
     return { image, css: { width: bounds.width, height: bounds.height } };
   };
-  const startAsk = async (displayId: number): Promise<void> => {
-    overlays.cancelWheel();
-    overlays.hideForCapture();
+  /**
+   * The screen as the question window should see it: the capture, and — when the setting asks for it — the frozen
+   * screen to drag a region out of. `cancelled` is the user backing out of the picker, which is not a failure.
+   */
+  const takeScreenshot = async (displayId: number): Promise<{ image: AskImage | null; cancelled: boolean }> => {
     const wantsPicker = store.get().askAiSelectRegion;
     // The picker page takes a moment to load: do it while the screen is captured, not after.
     if (wantsPicker) warmPickWindow();
@@ -422,32 +424,38 @@ function start(): void {
       capture = devCapture() ?? (await captureDisplay(displayId));
     } catch (err) {
       console.warn('[ask]', err);
+    }
+    if (!capture) return { image: null, cancelled: false };
+    if (!wantsPicker) return { image: askImageOf(capture.image), cancelled: false };
+    // The picker covers the screen: keep gestures suspended, exactly as the question window does.
+    const before = asking;
+    asking = true;
+    syncSuspend();
+    let picked: PickResult | null = null;
+    try {
+      picked = await pickRegion(displayId, capture, text().lang);
+    } catch (err) {
+      console.warn('[ask]', err); // a picker that can't open still asks, about the whole display
+    }
+    asking = before;
+    syncSuspend();
+    if (picked?.kind === 'cancelled') return { image: null, cancelled: true };
+    return { image: picked ? cropAskImage(capture, picked.rect) : askImageOf(capture.image), cancelled: false };
+  };
+
+  /** The wheel's slice was chosen: the overlays come off the screen first (a wheel or a ping still being drawn would
+   *  end up in the picture), then the screenshot is taken and the question window opens on it. */
+  const startAsk = async (displayId: number): Promise<void> => {
+    overlays.cancelWheel();
+    overlays.hideForCapture();
+    let taken: Awaited<ReturnType<typeof takeScreenshot>>;
+    try {
+      taken = await takeScreenshot(displayId);
     } finally {
       overlays.showForCapture();
     }
-    let image: AskImage | null = null;
-    if (capture) {
-      if (wantsPicker) {
-        // The picker covers the screen: keep gestures suspended, exactly as the question window does.
-        const before = asking;
-        asking = true;
-        syncSuspend();
-        let picked: PickResult | null = null;
-        try {
-          picked = await pickRegion(displayId, capture, text().lang);
-        } catch (err) {
-          console.warn('[ask]', err); // a picker that can't open still asks, about the whole display
-        }
-        if (picked?.kind === 'cancelled') {
-          asking = before;
-          syncSuspend();
-          return;
-        }
-        image = picked ? cropAskImage(capture, picked.rect) : askImageOf(capture.image);
-      } else {
-        image = askImageOf(capture.image);
-      }
-    }
+    if (taken.cancelled) return;
+    const image = taken.image;
     // The small copy kept with the saved conversation is of what was actually sent, not of the whole display: the
     // history should look like what the answer was about. It is never sent anywhere; the full picture goes to the API.
     openAskWindow({
@@ -457,6 +465,26 @@ function start(): void {
       imageFailed: image === null,
       lang: text().lang,
     });
+  };
+
+  /**
+   * A new screenshot for a conversation that is already open. The question window hides itself for the picture and
+   * comes back for the region pick, so what is captured is the user's screen and not the card that asked.
+   */
+  const captureForAsk = async (): Promise<{ image: AskImage | null; failed: boolean }> => {
+    const w = askWindow();
+    if (!w) return { image: null, failed: true };
+    const displayId = screen.getDisplayMatching(w.getBounds()).id;
+    w.hide();
+    try {
+      const taken = await takeScreenshot(displayId);
+      return { image: taken.image, failed: !taken.cancelled && taken.image === null };
+    } finally {
+      if (!w.isDestroyed()) {
+        w.show();
+        w.focus();
+      }
+    }
   };
   overlays.on('asked', (at: AskedAt) => {
     // The window reports its own failures; anything thrown here would otherwise vanish without a trace.
@@ -469,6 +497,7 @@ function start(): void {
       asking = on;
       syncSuspend();
     },
+    captureForAsk,
   });
   installPickIpc();
 

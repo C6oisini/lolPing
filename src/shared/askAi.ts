@@ -73,10 +73,18 @@ export interface AskState {
   error?: string;
 }
 
-/** One finished exchange. The window keeps the same list the model is sent, so a follow-up has the context. */
+/**
+ * One finished exchange. The window keeps the same list the model is sent, so a follow-up has the context.
+ *
+ * A question carries the screenshot it was asked about, if it had one: a conversation can be shown a new picture in
+ * the middle of it ("look, now this"), and a later question has to mention that picture again for the model — which
+ * remembers nothing between requests — to still be answering about it.
+ */
 export interface AskTurn {
   role: 'user' | 'assistant';
   text: string;
+  /** The screenshot this question was asked about, on user turns only. */
+  image?: AskImage | null;
 }
 
 /** A conversation as it is saved: the turns, what was sent, and when it was last touched. */
@@ -103,22 +111,25 @@ export interface AskMessage {
 const imagePart = (url: string): Record<string, unknown> => ({ type: 'image_url', image_url: { url, detail: 'high' } });
 
 /**
- * The request messages for a question: the system prompt, every finished turn, then this question. The screenshot is
- * attached to the first question of the conversation only — later turns refer back to it, and repeating it would send
- * the same picture (and its tokens) again on every follow-up.
+ * The request messages for a question: the system prompt, every finished turn, then this question. Every question that
+ * was asked about a picture carries its own, so a conversation that was shown a second screenshot further down keeps
+ * both — the model is stateless, and a picture left out of the request is a picture it cannot see.
  */
 export function askMessages(system: string, history: readonly AskTurn[], question: string, image: string | null): AskMessage[] {
   const messages: AskMessage[] = [{ role: 'system', content: system }];
-  let attached = image === null;
   for (const turn of history) {
-    if (turn.role === 'user' && !attached) {
-      attached = true;
-      messages.push({ role: 'user', content: [{ type: 'text', text: turn.text }, imagePart(image as string)] });
-    } else {
-      messages.push({ role: turn.role, content: turn.text });
-    }
+    const url = turn.role === 'user' ? turn.image?.dataUrl ?? null : null;
+    messages.push(
+      url
+        ? { role: 'user', content: [{ type: 'text', text: turn.text }, imagePart(url)] }
+        : { role: turn.role, content: turn.text },
+    );
   }
-  messages.push(attached ? { role: 'user', content: question } : { role: 'user', content: [{ type: 'text', text: question }, imagePart(image as string)] });
+  messages.push(
+    image
+      ? { role: 'user', content: [{ type: 'text', text: question }, imagePart(image)] }
+      : { role: 'user', content: question },
+  );
   return messages;
 }
 
@@ -168,6 +179,14 @@ export interface PickApi {
   cancel(): Promise<void>;
 }
 
+/** What a new screenshot for the conversation came back as: the picture, or why there is none. */
+export interface AskAttach {
+  /** The screenshot to ask the next question about, or null when there is none. */
+  image: AskImage | null;
+  /** True when a capture was attempted and failed: cancelled is not a failure. */
+  failed: boolean;
+}
+
 /** window.askApi in the ask renderer. */
 export interface AskApi {
   getContext(): Promise<AskContext>;
@@ -181,12 +200,19 @@ export interface AskApi {
   copy(text: string): Promise<void>;
   /** Opens Settings on the Ask AI section, for the API key. */
   openSettings(): Promise<void>;
+  /**
+   * Takes a new screenshot for the question being typed: the same capture and region pick the wheel's slice does, with
+   * this window taken off the screen first. The picture goes with the next question.
+   */
+  attachScreenshot(): Promise<AskAttach>;
   /** The saved conversations, newest first. Empty when the history is off or nothing was said yet. */
   history(): Promise<ConversationSummary[]>;
   /** Opens a saved conversation in this window, replacing what is on screen. */
   loadHistory(id: string): Promise<void>;
   /** Forgets one saved conversation; the new list comes back. */
   removeHistory(id: string): Promise<ConversationSummary[]>;
+  /** Gives one saved conversation a name of the user's own; the new list comes back. */
+  renameHistory(id: string, title: string): Promise<ConversationSummary[]>;
   /** Forgets every saved conversation. */
   clearHistory(): Promise<void>;
   onChunk(cb: (c: AskChunk) => void): () => void;

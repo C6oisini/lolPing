@@ -45,6 +45,23 @@ describe('trimConversation', () => {
     const long = trimConversation({ ...conversation('k3-aaaaaa', 1), turns: [{ role: 'user', text: 'x'.repeat(MAX_TURN_CHARS + 500) }] });
     expect(long.turns[0].text).toHaveLength(MAX_TURN_CHARS);
   });
+
+  it('keeps the screenshot a question was asked about, and drops anything that is not one', () => {
+    const shot = { dataUrl: 'data:image/jpeg;base64,AAAA', width: 320, height: 180 };
+    const trimmed = trimConversation({
+      ...conversation('k4-aaaaaa', 1),
+      turns: [
+        { role: 'user', text: '看这个', image: shot },
+        { role: 'assistant', text: '好' },
+        { role: 'user', text: '第二问', image: null },
+        { role: 'user', text: '第三问', image: { dataUrl: 'not-an-image', width: 1, height: 1 } },
+      ],
+    });
+    expect(trimmed.turns[0].image).toEqual(shot);
+    expect(trimmed.turns[1].image).toBeNull();
+    expect(trimmed.turns[2].image).toBeNull();
+    expect(trimmed.turns[3].image).toBeNull();
+  });
 });
 
 describe('parseConversation', () => {
@@ -126,5 +143,31 @@ describe('ConversationStore', () => {
     await store.remove('../../escape');
     expect(await store.load('../../escape')).toBeNull();
     expect(await store.list()).toEqual([]);
+  });
+
+  it('keeps the screenshot of each question across a save and a load', async () => {
+    const shot = { dataUrl: 'data:image/jpeg;base64,AAAA', width: 320, height: 180 };
+    await store.save({
+      ...conversation('g1-aaaaaa', 1),
+      turns: [
+        { role: 'user', text: '看这个', image: shot },
+        { role: 'assistant', text: '好' },
+        { role: 'user', text: '那这个呢' },
+      ],
+    });
+    const loaded = await store.load('g1-aaaaaa');
+    expect(loaded?.turns[0].image).toEqual(shot);
+    expect(loaded?.turns[1].image).toBeNull();
+    expect(loaded?.turns[2].image).toBeNull();
+  });
+
+  it('renames one without moving it in the list', async () => {
+    await store.save(conversation('h1-aaaaaa', 100));
+    await store.save(conversation('h2-aaaaaa', 300));
+    const list = await store.rename('h1-aaaaaa', '  新 名字  ');
+    expect(list.map((c) => c.id)).toEqual(['h2-aaaaaa', 'h1-aaaaaa']); // the order is when it was last talked about
+    expect((await store.load('h1-aaaaaa'))?.title).toBe('新 名字');
+    expect(list[1].turns).toBe(2);
+    expect(await store.rename('nope-aaaaaa', 'x')).toHaveLength(2); // an unknown id changes nothing
   });
 });

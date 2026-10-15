@@ -38,6 +38,7 @@ describe('the ping wheel with the Ask AI slice', () => {
 
 describe('askMessages', () => {
   const image = 'data:image/jpeg;base64,AAAA';
+  const shot = { dataUrl: image, width: 1600, height: 900 };
 
   it('sends the first question with the screenshot', () => {
     const messages = askMessages('sys', [], '现在做什么？', image);
@@ -53,15 +54,18 @@ describe('askMessages', () => {
     ]);
   });
 
-  it('attaches the screenshot once, to the first question, and sends the rest as plain text', () => {
+  it('keeps every screenshot with the question it was taken for', () => {
+    const second = 'data:image/jpeg;base64,BBBB';
     const history = [
-      { role: 'user' as const, text: '现在做什么？' },
+      { role: 'user' as const, text: '现在做什么？', image: shot },
       { role: 'assistant' as const, text: '退回塔下。' },
+      { role: 'user' as const, text: '看这个', image: { ...shot, dataUrl: second } },
+      { role: 'assistant' as const, text: '装备出破败。' },
     ];
-    const messages = askMessages('sys', history, '那出什么装备？', image);
-    expect(messages).toHaveLength(4);
+    const messages = askMessages('sys', history, '那出什么装备？', null);
+    expect(messages).toHaveLength(6);
     expect(messages[0]).toEqual({ role: 'system', content: 'sys' });
-    // The picture stays with the turn that started the conversation; repeating it would cost its tokens on every follow-up.
+    // A conversation can be shown a second picture halfway through, and both stay with the question they belong to.
     expect(messages[1]).toEqual({
       role: 'user',
       content: [
@@ -70,7 +74,28 @@ describe('askMessages', () => {
       ],
     });
     expect(messages[2]).toEqual({ role: 'assistant', content: '退回塔下。' });
-    expect(messages[3]).toEqual({ role: 'user', content: '那出什么装备？' });
+    expect(messages[3]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: '看这个' },
+        { type: 'image_url', image_url: { url: second, detail: 'high' } },
+      ],
+    });
+    expect(messages[4]).toEqual({ role: 'assistant', content: '装备出破败。' });
+    expect(messages[5]).toEqual({ role: 'user', content: '那出什么装备？' });
+  });
+
+  it('attaches a new screenshot to the question it comes with, not to an earlier one', () => {
+    const history = [{ role: 'user' as const, text: '第一问' }, { role: 'assistant' as const, text: '答' }];
+    const messages = askMessages('sys', history, '第二问', image);
+    expect(messages[1]).toEqual({ role: 'user', content: '第一问' });
+    expect(messages[3]).toEqual({
+      role: 'user',
+      content: [
+        { type: 'text', text: '第二问' },
+        { type: 'image_url', image_url: { url: image, detail: 'high' } },
+      ],
+    });
   });
 
   it('sends plain text when there is no screenshot at all', () => {

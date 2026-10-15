@@ -152,6 +152,39 @@ body {
   color: #ffb4b4;
 }
 
+.historyEdit {
+  flex: none;
+  width: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.historyEdit:hover {
+  border-color: rgba(200, 170, 110, 0.5);
+  color: var(--ink);
+}
+
+/* Renaming a row: the name is edited in place, in the row's own width. */
+.historyName {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 10px;
+  border: 1px solid rgba(200, 170, 110, 0.5);
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ink);
+  font: inherit;
+  font-size: 12.5px;
+}
+
+.historyName:focus {
+  outline: none;
+}
+
 .head {
   display: flex;
   align-items: center;
@@ -239,6 +272,30 @@ body {
 .askRow {
   display: flex;
   gap: 8px;
+}
+
+/* Taking another screenshot mid-conversation: a quiet button beside Ask, as tall as the row it sits in. */
+button.shotBtn {
+  -webkit-app-region: no-drag;
+  align-self: stretch;
+  padding: 0 10px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+button.shotBtn:hover {
+  color: var(--ink);
+  border-color: rgba(200, 170, 110, 0.5);
+}
+
+button.shotBtn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 textarea {

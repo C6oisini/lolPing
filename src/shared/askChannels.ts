@@ -18,12 +18,16 @@ export const ASK_CH = {
   copy: 'ask:copy',
   /** invoke → void: opens Settings on the Ask AI section. */
   openSettings: 'ask:openSettings',
+  /** invoke → AskAttach: captures a new screenshot for the question being typed. */
+  attach: 'ask:attach',
   /** invoke → ConversationSummary[]: the saved conversations, newest first. */
   history: 'ask:history',
   /** invoke(id) → void: opens a saved conversation in the window. */
   historyLoad: 'ask:historyLoad',
   /** invoke(id) → ConversationSummary[]: forgets one saved conversation, and answers with the new list. */
   historyRemove: 'ask:historyRemove',
+  /** invoke(id, title) → ConversationSummary[]: renames one saved conversation, and answers with the new list. */
+  historyRename: 'ask:historyRename',
   /** invoke → void: forgets every saved conversation. */
   historyClear: 'ask:historyClear',
   /** main → renderer: one piece of the answer (or of the model's thinking). */

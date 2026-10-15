@@ -42,12 +42,15 @@ const isImage = (v: unknown): v is AskImage => {
   return typeof i.dataUrl === 'string' && i.dataUrl.startsWith('data:image/') && typeof i.width === 'number' && typeof i.height === 'number';
 };
 
+/** A turn as it is stored: what it said, and the screenshot it was asked about when it had one. */
+const turnOf = (t: AskTurn): AskTurn => ({ role: t.role, text: t.text.slice(0, MAX_TURN_CHARS), image: isImage(t.image) ? t.image : null });
+
 /** Caps a conversation to what is worth storing, so one long chat cannot fill the directory. */
 export function trimConversation(c: StoredConversation): StoredConversation {
   return {
     ...c,
     title: c.title.replace(/\s+/g, ' ').trim().slice(0, 200),
-    turns: c.turns.slice(-MAX_TURNS).map((t) => ({ role: t.role, text: t.text.slice(0, MAX_TURN_CHARS) })),
+    turns: c.turns.slice(-MAX_TURNS).map(turnOf),
   };
 }
 
@@ -62,7 +65,7 @@ export function parseConversation(raw: unknown): StoredConversation | null {
     at: c.at,
     title: typeof c.title === 'string' ? c.title.slice(0, 200) : '',
     image: isImage(c.image) ? c.image : null,
-    turns: c.turns,
+    turns: (c.turns as AskTurn[]).map(turnOf),
   };
 }
 
@@ -124,6 +127,16 @@ export class ConversationStore {
   async remove(id: string): Promise<void> {
     if (!isConversationId(id)) return;
     await unlink(this.file(id)).catch(() => undefined);
+  }
+
+  /**
+   * Gives one conversation a name of the user's own, and answers with the list as it now stands. Its place in the list
+   * is when it was last talked about, which renaming does not change: the rows do not jump around while they are read.
+   */
+  async rename(id: string, title: string): Promise<ConversationSummary[]> {
+    const found = await this.load(id);
+    if (found) await this.save({ ...found, title });
+    return this.list();
   }
 
   async clear(): Promise<void> {
