@@ -1,10 +1,12 @@
-import { desktopCapturer, screen, type Display, type NativeImage } from 'electron';
+import { desktopCapturer, nativeImage, screen, type Display, type NativeImage } from 'electron';
 import { selectionToPixels, type AskImage, type PickRect } from '../shared/askAi';
 
 /** Long edge of the image that is sent. The API scales it down to about 1300 px anyway, so more only costs upload time. */
 const MAX_EDGE = 1600;
 /** Long edge of the frozen picture the picker shows: the display's own pixels, capped, because it travels over IPC. */
 const PREVIEW_EDGE = 2560;
+/** Long edge of the copy kept with a saved conversation: a thumbnail, since a history of them is written to disk. */
+const STORED_EDGE = 320;
 const JPEG_QUALITY = 88;
 /** A drag shorter than this in both directions is a click: the whole display is wanted. Matches MIN_PX in the picker. */
 export const MIN_SELECTION_PX = 12;
@@ -36,6 +38,20 @@ export function askImageOf(image: NativeImage, max = MAX_EDGE): AskImage {
 
 /** The frozen picture for the picker: the display as it is, capped so the IPC payload stays reasonable. */
 export const previewOf = (capture: Capture): AskImage => askImageOf(capture.image, PREVIEW_EDGE);
+
+/**
+ * A thumbnail of a picture that is already encoded, for the conversation it belongs to. This is the only screenshot
+ * data that is ever written down, and it is a few tens of kilobytes: enough to recognise the conversation by, and to
+ * show the model again when the conversation is reopened, but not the screenshot itself.
+ */
+export function storedPreviewOf(image: AskImage): AskImage {
+  try {
+    const native = nativeImage.createFromDataURL(image.dataUrl);
+    return native.isEmpty() ? image : askImageOf(native, STORED_EDGE);
+  } catch {
+    return image;
+  }
+}
 
 /**
  * The screenshot to send: `rect` is the picker's selection in the display's CSS pixels, or null (or a click-sized box)

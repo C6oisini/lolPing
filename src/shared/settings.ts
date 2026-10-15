@@ -82,6 +82,11 @@ export interface Settings {
   /** The size the question window was dragged to, so the next question opens the way the last one was left. */
   askAiWindowWidth: number;
   askAiWindowHeight: number;
+  /**
+   * Keep every conversation under `%APPDATA%\lolPing\conversations`, so the window can open an older one again.
+   * Off means a conversation lives only as long as its window, which is what this did before there was a history.
+   */
+  askAiKeepHistory: boolean;
   /** Look for a new version on launch and every few hours. Checking by hand always works. */
   autoUpdateCheck: boolean;
   /** The newest version already announced with a toast, as x.y.z, so each version is announced once. */
@@ -132,6 +137,7 @@ export const DEFAULT_SETTINGS: Settings = {
   askAiSelectRegion: true,
   askAiWindowWidth: 680,
   askAiWindowHeight: 540,
+  askAiKeepHistory: true,
   autoUpdateCheck: true,
   updateNotifiedVersion: null,
 };
@@ -150,7 +156,7 @@ export const LIMITS = {
 
 type NumKey = keyof typeof LIMITS;
 type BoolKey = 'enabledOnStart' | 'clickPing' | 'gameCheck' | 'muted' | 'tickSound' | 'launchAtStartup' | 'allowInternet' | 'rejoinRoom' | 'roomMuted'
-  | 'emoteClick' | 'emoteSound' | 'autoUpdateCheck' | 'askAiSelectRegion';
+  | 'emoteClick' | 'emoteSound' | 'autoUpdateCheck' | 'askAiSelectRegion' | 'askAiKeepHistory';
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v);
 const isVk = (v: unknown): v is number => Number.isInteger(v) && (v as number) >= 1 && (v as number) <= 254;
@@ -295,6 +301,7 @@ export function normalizeSettings(raw: unknown, platform: Platform = 'win', iden
     askAiSelectRegion: bool(r.askAiSelectRegion, 'askAiSelectRegion'),
     askAiWindowWidth: num(r.askAiWindowWidth, 'askAiWindowWidth'),
     askAiWindowHeight: num(r.askAiWindowHeight, 'askAiWindowHeight'),
+    askAiKeepHistory: bool(r.askAiKeepHistory, 'askAiKeepHistory'),
     autoUpdateCheck: bool(r.autoUpdateCheck, 'autoUpdateCheck'),
     updateNotifiedVersion: isVersion(r.updateNotifiedVersion) ? r.updateNotifiedVersion : null,
   };

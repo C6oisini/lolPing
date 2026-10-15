@@ -1,9 +1,11 @@
 import { BrowserWindow, clipboard, ipcMain, screen, type Display } from 'electron';
+import { join } from 'node:path';
 import { ASK_CH } from '../shared/askChannels';
 import { askDefaultPrompt, type AskChunk, type AskContext, type AskImage, type AskState, type AskTurn } from '../shared/askAi';
 import type { Lang } from '../shared/i18n';
 import { AskCancelled, AskTimeout, streamAsk } from './askAi';
-import { loadPage, pageUrl, preloadPath } from './paths';
+import { ConversationStore, isConversationId, newConversationId } from './conversationStore';
+import { loadPage, pageUrl, preloadPath, settingsDir } from './paths';
 import type { SettingsStore } from './settingsStore';
 
 export interface AskDeps {
@@ -23,8 +25,31 @@ let context: AskContext | null = null;
 let state: AskState = { status: 'idle' };
 /** What has been asked and answered about this screenshot: a new screenshot starts a new conversation. */
 let history: AskTurn[] = [];
+/** Which saved conversation this window is showing. A new screenshot or "New chat" starts another one. */
+let conversationId: string | null = null;
+/** A small copy of the screenshot, for the saved conversation only: the full picture is never written down. */
+let preview: AskImage | null = null;
 /** The answer in flight, if any. */
 let running: AbortController | null = null;
+
+/** The saved conversations, opened on first use. */
+let store: ConversationStore | null = null;
+const conversations = (): ConversationStore => (store ??= new ConversationStore(join(settingsDir(), 'conversations')));
+
+/** Saves what has been said so far, when the user keeps a history. Called after every turn, so the window closing
+ *  (or the app being killed) cannot lose the conversation. */
+function remember(): void {
+  const s = deps?.store.get();
+  if (!s?.askAiKeepHistory || !conversationId || !context || history.length === 0) return;
+  const firstQuestion = history.find((t) => t.role === 'user');
+  void conversations().save({
+    id: conversationId,
+    at: Date.now(),
+    title: firstQuestion?.text ?? '',
+    image: preview,
+    turns: history,
+  });
+}
 
 /** The ask window, if one is open and alive. */
 export function askWindow(): BrowserWindow | null {
@@ -76,7 +101,7 @@ function placeOn(display: Display): { x: number; y: number; width: number; heigh
  * Opens the question window on `displayId` (centred there), showing `image` as the screenshot it is asking about.
  * A window that is already open just takes the new screenshot and comes to the front.
  */
-export function openAskWindow(opts: { displayId: number; image: AskImage | null; imageFailed: boolean; lang: Lang }): void {
+export function openAskWindow(opts: { displayId: number; image: AskImage | null; preview: AskImage | null; imageFailed: boolean; lang: Lang }): void {
   if (!deps) return;
   const display = screen.getAllDisplays().find((d) => d.id === opts.displayId) ?? screen.getPrimaryDisplay();
   const s = deps.store.get();
@@ -91,6 +116,8 @@ export function openAskWindow(opts: { displayId: number; image: AskImage | null;
   // created or reused. Without this, a conversation left over from a window the user closed would be sent again with
   // the new picture, which is both confusing for the model and a needless repeat of what was said before.
   history = [];
+  preview = opts.preview;
+  conversationId = newConversationId();
   const existing = askWindow();
   if (existing) {
     // Re-centre it on the display, but keep whatever size the user has dragged it to: the size is theirs, the place ours.
@@ -213,12 +240,16 @@ async function submit(question: string): Promise<void> {
       // What the model is told matches what the window shows, so a follow-up has the same context the user can read.
       history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
       setState({ status: 'done' });
+      remember();
     }
   } catch (err) {
     if (running !== ctrl) return; // replaced or cancelled: its own state already won
     if (err instanceof AskCancelled) {
       // A stopped answer is kept in the transcript and in the context: the next question builds on what was said.
-      if (answer.length > 0) history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+      if (answer.length > 0) {
+        history = [...asked, { role: 'user', text: question }, { role: 'assistant', text: answer }];
+        remember();
+      }
       setState({ status: 'idle' });
     } else if (err instanceof AskTimeout) {
       setState({ status: 'error', error: 'timeout' });
@@ -228,6 +259,24 @@ async function submit(question: string): Promise<void> {
   } finally {
     if (running === ctrl) running = null;
   }
+}
+
+/**
+ * Opens a saved conversation in this window. The turns come back, and with them the small copy of the screenshot it
+ * was about, so a follow-up is asked about the same thing the first question was.
+ */
+async function openStored(rawId: unknown): Promise<void> {
+  if (!isConversationId(rawId) || !context || !askWindow()) return;
+  const stored = await conversations().load(rawId);
+  if (!stored || !context || !askWindow()) return;
+  stopAnswer();
+  conversationId = stored.id;
+  history = stored.turns;
+  preview = stored.image;
+  context = { ...context, image: stored.image, imageFailed: false };
+  setState({ status: 'idle' });
+  send(ASK_CH.context, context);
+  send(ASK_CH.restore, history);
 }
 
 export function installAskIpc(d: AskDeps): void {
@@ -242,8 +291,17 @@ export function installAskIpc(d: AskDeps): void {
   ipcMain.handle(ASK_CH.clear, () => {
     stopAnswer();
     history = [];
+    // "New chat" keeps the screenshot and starts another conversation, so the one that just ended stays in the list.
+    conversationId = newConversationId();
     setState({ status: 'idle' });
   });
+  ipcMain.handle(ASK_CH.history, () => conversations().list());
+  ipcMain.handle(ASK_CH.historyLoad, (_e, raw: unknown) => openStored(raw));
+  ipcMain.handle(ASK_CH.historyRemove, async (_e, raw: unknown) => {
+    if (isConversationId(raw)) await conversations().remove(raw);
+    return conversations().list();
+  });
+  ipcMain.handle(ASK_CH.historyClear, () => conversations().clear());
   ipcMain.handle(ASK_CH.copy, (_e, raw: unknown) => {
     if (typeof raw === 'string' && raw.length > 0) void clipboard.writeText(raw.slice(0, 100_000)).catch(() => undefined);
   });

@@ -39,6 +39,117 @@ body {
   border-radius: 16px;
   background: var(--panel);
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.55);
+  /* The history panel covers the card rather than replacing its contents, so the conversation underneath is kept. */
+  position: relative;
+}
+
+/* The saved conversations: a list over the card, one row each, with a thumbnail of what was asked about. */
+.history {
+  position: absolute;
+  inset: 10px;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: rgba(13, 16, 22, 0.97);
+}
+
+.historyHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyHead b {
+  flex: 1;
+  font-size: 13px;
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.historyEmpty {
+  margin: 6px 2px;
+  color: var(--dim);
+  font-size: 12px;
+}
+
+.historyRow {
+  display: flex;
+  gap: 6px;
+}
+
+.historyOpen {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.historyOpen:hover {
+  border-color: rgba(200, 170, 110, 0.5);
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.historyShot {
+  flex: none;
+  width: 52px;
+  height: 34px;
+  object-fit: cover;
+  border-radius: 6px;
+}
+
+.historyText {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.historyText b {
+  overflow: hidden;
+  font-size: 12.5px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.historyWhen {
+  color: var(--dim);
+  font-size: 11px;
+}
+
+.historyDelete {
+  flex: none;
+  width: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--dim);
+  font: inherit;
+  cursor: pointer;
+}
+
+.historyDelete:hover {
+  border-color: rgba(255, 120, 120, 0.45);
+  color: #ffb4b4;
 }
 
 .head {

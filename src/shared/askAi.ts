@@ -79,6 +79,21 @@ export interface AskTurn {
   text: string;
 }
 
+/** A conversation as it is saved: the turns, what was sent, and when it was last touched. */
+export interface StoredConversation {
+  id: string;
+  /** When it was last touched, in ms since the epoch: the history list is ordered by this. */
+  at: number;
+  /** The first question, for the list. */
+  title: string;
+  /** A small copy of the screenshot the conversation was about, or null when the capture failed. */
+  image: AskImage | null;
+  turns: AskTurn[];
+}
+
+/** A saved conversation without its turns: what the history list needs. */
+export type ConversationSummary = Omit<StoredConversation, 'turns'> & { turns: number };
+
 /** A message in the request body: the plain-text turns, and the one that carries the screenshot. */
 export interface AskMessage {
   role: 'system' | 'user' | 'assistant';
@@ -166,8 +181,18 @@ export interface AskApi {
   copy(text: string): Promise<void>;
   /** Opens Settings on the Ask AI section, for the API key. */
   openSettings(): Promise<void>;
+  /** The saved conversations, newest first. Empty when the history is off or nothing was said yet. */
+  history(): Promise<ConversationSummary[]>;
+  /** Opens a saved conversation in this window, replacing what is on screen. */
+  loadHistory(id: string): Promise<void>;
+  /** Forgets one saved conversation; the new list comes back. */
+  removeHistory(id: string): Promise<ConversationSummary[]>;
+  /** Forgets every saved conversation. */
+  clearHistory(): Promise<void>;
   onChunk(cb: (c: AskChunk) => void): () => void;
   onState(cb: (s: AskState) => void): () => void;
   /** A new screenshot arrived (the slice was chosen again while this window was open). */
   onContext(cb: (c: AskContext) => void): () => void;
+  /** A saved conversation was opened: draw these turns (the screenshot has already come through onContext). */
+  onRestore(cb: (turns: AskTurn[]) => void): () => void;
 }

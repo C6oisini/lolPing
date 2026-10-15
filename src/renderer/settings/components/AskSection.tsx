@@ -1,5 +1,5 @@
 import { Input, Textarea } from '@fluentui/react-components';
-import { Bot24Regular, DocumentText24Regular, Key24Regular, Server24Regular, Crop24Regular } from '@fluentui/react-icons';
+import { Bot24Regular, DocumentText24Regular, History24Regular, Key24Regular, Server24Regular, Crop24Regular } from '@fluentui/react-icons';
 import { useEffect, useState, type ReactNode } from 'react';
 import { DEFAULT_ASK_BASE_URL, DEFAULT_ASK_MODEL } from '../../../shared/askAi';
 import type { Settings } from '../../../shared/settings';
@@ -82,6 +82,8 @@ export function AskSection({ settings: s, update, trigger }: { settings: Setting
         value={s.askAiPrompt} onSave={(askAiPrompt) => void update({ askAiPrompt })} />
       <SwitchRow icon={<Crop24Regular />} title={t.askSelectRegion} description={t.askSelectRegionDesc}
         checked={s.askAiSelectRegion} onChange={(v) => void update({ askAiSelectRegion: v })} />
+      <SwitchRow icon={<History24Regular />} title={t.askKeepHistory} description={t.askKeepHistoryDesc}
+        checked={s.askAiKeepHistory} onChange={(v) => void update({ askAiKeepHistory: v })} />
       <p className="desc roomNote">{t.askShareNote}</p>
     </>
   );

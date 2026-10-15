@@ -15,6 +15,7 @@
         <span class="spark"></span>
         <b id="title">Ask AI</b>
         <span class="model" id="model"></span>
+        <button class="link" id="historyBtn" type="button">History</button>
         <button class="link" id="newChat" type="button">New chat</button>
         <button class="icon" id="close" type="button">✕</button>
       </header>
@@ -41,6 +42,14 @@
         </div>
         <span class="note" id="note"></span>
       </footer>
+      <div class="history" id="history" hidden>
+        <div class="historyHead">
+          <b id="historyTitle"></b>
+          <button class="link" id="historyClear" type="button"></button>
+          <button class="icon" id="historyClose" type="button">✕</button>
+        </div>
+        <div class="historyList" id="historyList"></div>
+      </div>
     </div>
     <script type="module" src="./main.ts"></script>
   </body>

@@ -24,7 +24,7 @@ import { assetPath, buildResourcePath, helperExePath, IS_MAC, PLATFORM, settings
 import { destroyPickWindow, installPickIpc, pickRegion, warmPickWindow } from './pickWindow';
 import { deriveRoomKeys } from './roomCrypto';
 import { RoomManager, type RoomToast } from './roomManager';
-import { askImageOf, captureDisplay, cropAskImage, type Capture } from './screenshot';
+import { askImageOf, captureDisplay, cropAskImage, storedPreviewOf, type Capture } from './screenshot';
 import { registerSettingsIpc } from './settingsIpc';
 import { SettingsStore } from './settingsStore';
 import { onSettingsWindowGone, openSettingsWindow, settingsWindow } from './settingsWindow';
@@ -448,7 +448,15 @@ function start(): void {
         image = askImageOf(capture.image);
       }
     }
-    openAskWindow({ displayId, image, imageFailed: image === null, lang: text().lang });
+    // The small copy kept with the saved conversation is of what was actually sent, not of the whole display: the
+    // history should look like what the answer was about. It is never sent anywhere; the full picture goes to the API.
+    openAskWindow({
+      displayId,
+      image,
+      preview: image ? storedPreviewOf(image) : null,
+      imageFailed: image === null,
+      lang: text().lang,
+    });
   };
   overlays.on('asked', (at: AskedAt) => {
     // The window reports its own failures; anything thrown here would otherwise vanish without a trace.

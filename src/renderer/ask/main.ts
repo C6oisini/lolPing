@@ -1,5 +1,5 @@
 import 'katex/dist/katex.min.css';
-import type { AskChunk, AskContext, AskState } from '../../shared/askAi';
+import type { AskChunk, AskContext, AskState, AskTurn, ConversationSummary } from '../../shared/askAi';
 import { strings, type Strings } from '../../shared/i18n';
 import { renderMarkdown } from './markdown';
 
@@ -8,6 +8,12 @@ const el = <T extends HTMLElement>(id: string): T => document.getElementById(id)
 const title = el('title');
 const model = el('model');
 const newChat = el<HTMLButtonElement>('newChat');
+const historyBtn = el<HTMLButtonElement>('historyBtn');
+const historyPanel = el('history');
+const historyTitle = el('historyTitle');
+const historyClear = el<HTMLButtonElement>('historyClear');
+const historyClose = el<HTMLButtonElement>('historyClose');
+const historyList = el('historyList');
 const closeBtn = el<HTMLButtonElement>('close');
 const shotRow = el('shotRow');
 const shot = el<HTMLImageElement>('shot');
@@ -117,6 +123,101 @@ function clearThread(): void {
   question.placeholder = t.askPlaceholder;
 }
 
+/** When a saved conversation was last touched, as its row shows it. */
+function when(at: number): string {
+  const date = new Date(at);
+  const clock = `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  const sameDay = (a: Date, b: Date): boolean =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+  const today = new Date();
+  if (sameDay(date, today)) return `${t.askHistoryToday} ${clock}`;
+  if (sameDay(date, new Date(today.getTime() - 86_400_000))) return `${t.askHistoryYesterday} ${clock}`;
+  const pad = (n: number): string => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
+}
+
+/** The saved conversations: one row each — what was asked about, when, and how many turns it ran. */
+function renderHistory(items: ConversationSummary[]): void {
+  historyList.textContent = '';
+  if (items.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'historyEmpty';
+    empty.textContent = t.askHistoryEmpty;
+    historyList.append(empty);
+    return;
+  }
+  for (const item of items) {
+    const row = document.createElement('div');
+    row.className = 'historyRow';
+    const open = document.createElement('button');
+    open.type = 'button';
+    open.className = 'historyOpen';
+    if (item.image) {
+      const thumb = document.createElement('img');
+      thumb.className = 'historyShot';
+      thumb.alt = '';
+      thumb.src = item.image.dataUrl;
+      open.append(thumb);
+    }
+    const text = document.createElement('span');
+    text.className = 'historyText';
+    const heading = document.createElement('b');
+    heading.textContent = item.title || t.askDefaultQuestion;
+    const meta = document.createElement('span');
+    meta.className = 'historyWhen';
+    meta.textContent = `${when(item.at)} · ${item.turns} ${t.askHistoryTurns}`;
+    text.append(heading, meta);
+    open.append(text);
+    open.addEventListener('click', () => {
+      historyPanel.hidden = true;
+      void window.askApi.loadHistory(item.id);
+    });
+    const remove = document.createElement('button');
+    remove.type = 'button';
+    remove.className = 'historyDelete';
+    remove.title = t.askHistoryDelete;
+    remove.textContent = '✕';
+    remove.addEventListener('click', () => void window.askApi.removeHistory(item.id).then(renderHistory));
+    row.append(open, remove);
+    historyList.append(row);
+  }
+}
+
+function openHistory(): void {
+  historyTitle.textContent = t.askHistoryTitle;
+  historyClear.textContent = t.askHistoryClear;
+  historyPanel.hidden = false;
+  void window.askApi.history().then(renderHistory);
+}
+
+/** A conversation opened from the history: its questions and answers as they were. The model's thinking was never
+ *  saved, so a restored answer has no folded reasoning above it. */
+function drawRestored(turns: AskTurn[]): void {
+  clearThread();
+  let answer: HTMLElement | null = null;
+  for (const turn of turns) {
+    if (turn.role === 'user') {
+      const wrap = document.createElement('div');
+      wrap.className = 'turn';
+      const q = document.createElement('div');
+      q.className = 'q';
+      q.textContent = turn.text;
+      answer = document.createElement('div');
+      answer.className = 'a';
+      wrap.append(q, answer);
+      thread.append(wrap);
+    } else if (answer) {
+      answer.innerHTML = format(turn.text);
+      lastAnswer = turn.text;
+      answer = null;
+    }
+  }
+  copy.hidden = lastAnswer.length === 0;
+  question.placeholder = t.askFollowUp;
+  toBottom();
+  question.focus();
+}
+
 function applyContext(c: AskContext): void {
   const first = ctx === undefined;
   ctx = c;
@@ -126,6 +227,9 @@ function applyContext(c: AskContext): void {
   model.textContent = t.askSubtitle(c.model);
   closeBtn.title = t.askClose;
   newChat.textContent = t.askNewChat;
+  historyBtn.textContent = t.askHistory;
+  historyBtn.title = t.askHistoryTitle;
+  historyPanel.hidden = true;
   question.placeholder = t.askPlaceholder;
   hint.textContent = t.askHint;
   note.textContent = t.askPaused;
@@ -206,6 +310,11 @@ newChat.addEventListener('click', () => {
   clearThread();
   question.focus();
 });
+historyBtn.addEventListener('click', openHistory);
+historyClose.addEventListener('click', () => { historyPanel.hidden = true; });
+historyClear.addEventListener('click', () => {
+  void window.askApi.clearHistory().then(() => renderHistory([]));
+});
 copy.addEventListener('click', () => {
   void window.askApi.copy(lastAnswer || answerText);
   copy.textContent = t.askCopied;
@@ -223,6 +332,7 @@ document.addEventListener('keydown', (e) => {
 window.askApi.onChunk(onChunk);
 window.askApi.onState(onState);
 window.askApi.onContext(applyContext);
+window.askApi.onRestore(drawRestored);
 window.addEventListener('focus', () => { if (!streaming) question.focus(); });
 
 void window.askApi.getContext().then((c) => {
